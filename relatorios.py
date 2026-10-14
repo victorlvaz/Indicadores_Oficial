@@ -1,0 +1,32 @@
+"""Lista de relatórios do app. Para adicionar um relatório novo:
+   1) crie a página em paginas/<nome>_tela.py
+   2) acrescente um item na lista RELATORIOS abaixo.
+O menu lateral e a página inicial são montados a partir desta lista.
+
+Regra bilíngue: "grupo" e "titulo" levam chinês e português lado a lado ("支线 Linha secundária");
+"descricao" leva o chinês na 1ª linha e o português na 2ª (use frase()).
+"""
+from comum.idioma import bi, frase
+
+RELATORIOS = [
+    {
+        "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("支线解封车率", "Lacre / Deslacre"),
+        "arquivo": "paginas/lacre_deslacre_tela.py",
+        "url": "lacre-deslacre",
+        "icone": ":material/lock:",
+        "descricao": frase("按区域统计封车率与解车率（集货与散货），含排名、目标和每日趋势。",
+                           "Taxa de lacramento e deslacramento por região (Coleta e Entrega), "
+                           "ranking, metas e tendência diária."),
+    },
+    {
+        "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("SM状态统计", "Estatística de Status dos SMs"),
+        "arquivo": "paginas/sm_tela.py",
+        "url": "sm",
+        "icone": ":material/location_on:",
+        "descricao": frase("按区域统计 SM 监控占比（集货与散货），数据来自 JMS 与 TECHIS，含趋势与未监控任务。",
+                           "Rastreamento efetivo dos SMs por regional (Coleta e Entrega), com dados do JMS e do "
+                           "TECHIS, tendência e viagens sem SM."),
+    },
+]

@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+~$*
+
+# Relatórios e dados reais: NUNCA subir para o GitHub
+*.xls
+*.xlsx
+*.xlsm
+*.csv
+# ...exceto as listas de apoio do código
+!lacre_deslacre/apoio/*.csv
+
+.streamlit/secrets.toml
