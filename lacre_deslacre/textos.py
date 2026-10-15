@@ -180,3 +180,8 @@ RES_SEM_DADOS = frase("所选筛选条件下没有数据。", "Sem dados para o 
 RES_GRAF_TAXA = bi("比率", "Taxa")                                                       # [revisar]
 RES_GRAF_VOL = bi("数量", "Volume")                                                      # [revisar]
 RES_LACUNA = frase("空白处表示该周期没有上传数据。", "Pontos vazios = período sem dados no histórico.")   # [revisar]
+
+
+RES_PILULA_W = frase("点击某一周查看每日数据；再次点击返回全年。", "Clique em uma semana para ver os dias dela; clique de novo para voltar ao ano.")   # [revisar]
+RES_PILULA_M = frase("点击某个月查看每日数据；再次点击返回全年。", "Clique em um mês para ver os dias dele; clique de novo para voltar ao ano.")   # [revisar]
+RES_DIAS_DE = bi("每日数据", "Dias de")                                                    # [revisar]

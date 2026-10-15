@@ -1,22 +1,26 @@
-"""Aba Resumo do SM: totais, taxa e gráficos por dia, semana ou mês, com filtro de regional."""
+"""Aba Resumo do SM: cobertura por regional (barras vermelho + cinza) e mini-gráficos por regional (Plotly).
+
+Pensado para mostrar "onde está o buraco" em vez de repetir a linha e as barras de volume do Lacre/Deslacre.
+"""
 from datetime import datetime
 
 import pandas as pd
 import streamlit as st
 
+from comum import periodos
 from comum.estilos import pct, pp
-from comum.graficos import grafico_taxa, grafico_volume
+from comum.graficos_plotly import cobertura, mini_graficos
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import opcao_valida
 from . import textos as tx
-from .calculos import resumo
-from .config import REGIOES, TIPOS
+from .calculos import resumo, resumo_regionais, tabela_periodo
+from .config import TIPOS
 
 VISOES = ("D", "W", "M")
 
 
 def _tabela(df: pd.DataFrame):
-    """(tabela crua para exportar, tabela estilizada para a tela). Total do período na 1ª linha, em cinza."""
+    """(tabela crua para exportar, tabela estilizada para a tela). Total do ano na 1ª linha, em cinza."""
     prev, real = int(df["prev"].sum()), int(df["real"].sum())
     total = {tx.RES_PERIODO: tx.TOTAL, tx.COL_PREV: prev, tx.COL_REAL: real,
              tx.COL_TAXA: real / prev if prev else float("nan"), tx.COL_VAR: float("nan")}
@@ -32,35 +36,45 @@ def _tabela(df: pd.DataFrame):
     return cru, txt.style.apply(lambda _: est, axis=None)
 
 
-def _secao(base, tipo, regional, freq, ini, fim, export):
+def _secao(base, tipo, freq, per, ini_ano, fim_ano, export):
+    """per = semana/mês clicado (os gráficos passam a mostrar os dias dele); None = o ano inteiro em `freq`."""
     st.subheader(tx.subtitulo_resumo(tipo))
-    df = resumo(base, tipo, freq, regional, ini, fim)
-    if df.empty or df["prev"].sum() == 0:
+    if per is None:
+        ini_p, fim_p, freq_g = ini_ano, fim_ano, freq
+    else:
+        ini_p, fim_p, freq_g = per, periodos.fim(per, freq), "D"
+    tab = tabela_periodo(base, tipo, ini_p, fim_p)
+    total, regs = tab.iloc[0], tab.iloc[1:]
+    if total["prev"] == 0:
         st.info(tx.RES_SEM_DADOS)
         return
-    prev, real = int(df["prev"].sum()), int(df["real"].sum())
-    taxa = real / prev
-    ultimo = df.dropna(subset=["taxa"]).iloc[-1]
-
     c1, c2, c3, c4 = st.columns(4)
-    c1.metric(tx.COL_PREV, f"{prev:,}".replace(",", "."))
-    c2.metric(tx.COL_REAL, f"{real:,}".replace(",", "."))
-    c3.metric(tx.COL_TAXA, pct(taxa))
-    delta = "" if pd.isna(ultimo["variacao"]) else pp(ultimo["variacao"]).replace("▲ ", "").replace("▼ ", "")
-    c4.metric(f"{tx.RES_ULTIMO} · {ultimo['periodo']}", pct(ultimo["taxa"]), delta or None, delta_color="off")
+    c1.metric(tx.COL_PREV, f"{int(total['prev']):,}".replace(",", "."))
+    c2.metric(tx.COL_REAL, f"{int(total['real']):,}".replace(",", "."))
+    c3.metric(tx.COL_TAXA, pct(total["taxa"]))
+    if per is not None:
+        ant = periodos.anterior(per, freq)
+        t_ant = tabela_periodo(base, tipo, ant, periodos.fim(ant, freq)).iloc[0]["taxa"]
+        delta = "" if pd.isna(t_ant) or pd.isna(total["taxa"]) else pp(total["taxa"] - t_ant).replace("▲ ", "").replace("▼ ", "")
+        c4.metric(f"{tx.COMP_LEGENDA}: {periodos.rotulo_curto(ant, freq)}", pct(t_ant), delta or None, delta_color="off")
+    else:
+        c4.metric(tx.RES_FALTAM, f"{int(total['prev'] - total['real']):,}".replace(",", "."))
 
-    ordem = list(df["periodo"])
-    g1, g2 = st.columns(2)
-    with g1:
-        st.altair_chart(grafico_taxa(df, ordem, None, pequeno=len(df) > 60, titulo_y=tx.RES_GRAF_TAXA,
-                                     titulo_periodo=tx.RES_PERIODO, titulo_taxa=tx.RES_GRAF_TAXA), width="stretch")
-    with g2:
-        st.altair_chart(grafico_volume(df, ordem, tx.COL_PREV, tx.COL_REAL, tx.RES_GRAF_VOL, tx.RES_PERIODO),
-                        width="stretch")
-    if df["taxa"].isna().any():
+    st.markdown(f"**{tx.RES_COBERTURA}**")
+    ordenada = regs[regs["prev"] > 0].sort_values("taxa", ascending=False)
+    st.plotly_chart(cobertura(ordenada, tx.COL_REAL, tx.RES_FALTAM), width="stretch", theme="streamlit",
+                    config={"displayModeBar": False}, key=f"smres_cob_{tipo}")
+
+    st.markdown(f"**{tx.RES_MINI}**")
+    rr = resumo_regionais(base, tipo, freq_g, ini_p, fim_p)
+    ordem = list(dict.fromkeys(rr["periodo"]))
+    st.plotly_chart(mini_graficos(rr, list(dict.fromkeys(rr["regiao"])), ordem, tx.RES_GRAF_TAXA), width="stretch",
+                    theme="streamlit", config={"displayModeBar": False}, key=f"smres_mini_{tipo}")
+    if rr["taxa"].isna().any():
         st.caption(tx.RES_LACUNA)
 
-    cru, estilizada = _tabela(df)
+    serie = resumo(base, tipo, freq_g, None, ini_p, fim_p)
+    cru, estilizada = _tabela(serie)
     with st.expander(tx.RES_TABELA):
         st.dataframe(estilizada, width="stretch", hide_index=True, height=min((len(cru) + 1) * 35 + 3, 420))
     exp = cru.copy()
@@ -74,20 +88,25 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
     anos = sorted(base["dia"].dt.year.unique(), reverse=True)
     opcoes_ano = anos + [None]
     opcao_valida("smres_ano", opcoes_ano)
-    regs = [r for r in REGIOES if r in set(base["regiao"])]
-    opcoes_reg = ["*"] + regs            # "*" = todas (None viraria o texto "Choose an option")
-    opcao_valida("smres_reg", opcoes_reg)
-
-    f1, f2, f3 = st.columns(3)
-    regional = f1.selectbox(tx.RES_REGIONAL, opcoes_reg, key="smres_reg",
-                            format_func=lambda r: tx.RES_TODAS if r == "*" else r)
-    regional = None if regional == "*" else regional
+    f1, f2 = st.columns(2)
+    atual = datetime.now().year
+    ano = f1.selectbox(tx.RES_ANO, opcoes_ano, index=anos.index(atual) if atual in anos else 0, key="smres_ano",
+                       format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
     freq = f2.radio(tx.RES_VISAO, VISOES, index=1, horizontal=True, key="smres_vis",
                     format_func=lambda g: tx.GRAN_NOMES[g])
-    atual = datetime.now().year
-    ano = f3.selectbox(tx.RES_ANO, opcoes_ano, index=anos.index(atual) if atual in anos else 0, key="smres_ano",
-                       format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
-    ini, fim = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1),
-                                                 pd.Timestamp(year=ano, month=12, day=31))
+    sub = base if ano is None else base[base["dia"].dt.year == ano]
+    ini_ano, fim_ano = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1),
+                                                         pd.Timestamp(year=ano, month=12, day=31))
+    per = None
+    if freq != "D":      # Semana ou Mês: botões clicáveis; em Dia nada aparece
+        lista = periodos.lista(sub["dia"], freq)
+        if lista:
+            chave = f"smres_pil_{freq}"
+            opcao_valida(chave, lista)
+            st.caption(tx.RES_PILULA_W if freq == "W" else tx.RES_PILULA_M)
+            per = st.pills(tx.GRAN_NOMES[freq], lista, selection_mode="single", default=lista[-1], key=chave,
+                           format_func=lambda p: periodos.rotulo_curto(p, freq, com_ano=ano is None))
+            if per is not None:
+                st.caption(f"{tx.RES_DIAS_DE}: {periodos.rotulo(per, freq)}")
     for tipo in TIPOS:
-        _secao(base, tipo, regional, freq, ini, fim, export)
+        _secao(base, tipo, freq, per, ini_ano, fim_ano, export)

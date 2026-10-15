@@ -183,7 +183,7 @@ COLUNAS_BASE = {                                                                
 from lacre_deslacre.textos import (BANCO_EM_USO, COL_COMP, COL_VAR, COMP_ANO, COMP_ANTERIOR, COMP_LEGENDA,  # noqa: E402,F401
                                    COMP_SEM_DADOS, COMP_SEM_TODOS, COMPARAR, ERRO_BANCO, GRAN, GRAN_NOMES, HIST,
                                    PENDENTE, PERIODO, RES_ANO, RES_GRAF_TAXA, RES_GRAF_VOL, RES_LACUNA, RES_NOTA,
-                                   RES_PERIODO, RES_REGIONAL, RES_SEM_DADOS, RES_TABELA, RES_TODAS,
+                                   RES_DIAS_DE, RES_PERIODO, RES_PILULA_M, RES_PILULA_W, RES_REGIONAL, RES_SEM_DADOS, RES_TABELA, RES_TODAS,
                                    RES_TODO_HISTORICO, RES_ULTIMO, RES_VISAO, SALVAR, SALVAR_AJUDA, SALVO_OK,
                                    SUB_CARGAS, UNIDADE_TENDENCIA)
 
@@ -196,3 +196,10 @@ def subtitulo_resumo(tipo: str) -> str:
 
 def aba_excel_resumo(tipo: str) -> str:
     return bi(f"{TIPO_ZH[tipo]}汇总", f"Res {TIPO_PT[tipo]}")
+
+
+RES_FALTAM = bi("缺少", "Faltam")                                                           # [revisar]
+RES_COBERTURA = bi("各区域监控覆盖（红 = 已监控，灰 = 缺少）", "Cobertura por regional (vermelho = monitorado, cinza = faltou)")   # [revisar]
+RES_MINI = bi("各区域趋势", "Evolução de cada regional")                                     # [revisar]
+RES_PERIODO_SEL = bi("周期（上方图表与指标）", "Período (cartões e cobertura)")             # [revisar]
+RES_TODO_PERIODO = bi("全部（所选年份）", "Todo o ano escolhido")                           # [revisar]

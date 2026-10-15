@@ -13,7 +13,7 @@ def grafico_taxa(df: pd.DataFrame, ordem: list, meta: float | None = None, peque
                  titulo_y: str = "", titulo_periodo: str = "Período", titulo_taxa: str = "Taxa") -> alt.Chart:
     """Linha vermelha com pontos cinza; a meta (se houver) é uma linha tracejada cinza."""
     x = alt.X("periodo:N", sort=ordem, title=None, axis=alt.Axis(labelAngle=-45, labelOverlap=True))
-    y = alt.Y("taxa:Q", title=titulo_y, axis=alt.Axis(format=".0%"), scale=alt.Scale(zero=False))
+    y = alt.Y("taxa:Q", title=titulo_y, axis=alt.Axis(format=".1%"), scale=alt.Scale(zero=False))
     dica = [alt.Tooltip("periodo:N", title=titulo_periodo), alt.Tooltip("taxa:Q", title=titulo_taxa, format=".2%"),
             alt.Tooltip("prev:Q", title="Previsto"), alt.Tooltip("real:Q", title="Realizado")]
     base = alt.Chart(df)

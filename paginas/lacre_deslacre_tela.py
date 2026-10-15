@@ -42,7 +42,7 @@ def _alinhar_direita(*colunas, estreitas=()):
     return cfg
 
 
-manter("res_reg", "res_vis", "res_ano", "lac_gran", "lac_comp", "lac_per_D", "lac_per_W", "lac_per_M", "lac_per_Y", "lac_n_dias", "lac_escala")
+manter("res_reg", "res_vis", "res_ano", "res_pil_W", "res_pil_M", "lac_gran", "lac_comp", "lac_per_D", "lac_per_W", "lac_per_M", "lac_per_Y", "lac_n_dias", "lac_escala")
 
 # ---------- Banco ----------
 try:

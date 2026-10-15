@@ -343,6 +343,25 @@ def resumo(base: pd.DataFrame, tipo: str, freq: str = "W", regional: str | None 
     return g.reset_index()[["inicio", "periodo", "prev", "real", "taxa", "variacao"]]
 
 
+def resumo_regionais(base: pd.DataFrame, tipo: str, freq: str = "W", ini=None, fim=None) -> pd.DataFrame:
+    """Previsto, realizado e taxa por regional e por período (mini-gráficos). Períodos sem viagem ficam com taxa vazia."""
+    sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim))]
+    cols = ["regiao", "inicio", "periodo", "prev", "real", "taxa"]
+    if sub.empty:
+        return pd.DataFrame(columns=cols)
+    g = sub.groupby(["regiao", periodos.inicio(sub["dia"], freq)])[["sm_prev", "sm_real"]].sum()
+    todos = periodos.completos(g.index.get_level_values(1).min(), g.index.get_level_values(1).max(), freq)
+    regs = [r for r in REGIOES if r in set(sub["regiao"])]
+    g = g.reindex(pd.MultiIndex.from_product([regs, todos], names=["regiao", "inicio"]), fill_value=0).reset_index()
+    g = g.rename(columns={"sm_prev": "prev", "sm_real": "real"})
+    g["taxa"] = (g["real"] / g["prev"]).where(g["prev"] > 0)
+    com_ano = len({d.year for d in todos}) > 1
+    g["periodo"] = [periodos.rotulo_curto(d, freq, com_ano=com_ano) for d in g["inicio"]]
+    return g[cols]
+
+
 def pendentes(base: pd.DataFrame, ini=None, fim=None) -> pd.DataFrame:
     """Viagens do período com SM realizado abaixo do previsto (para as regionais cobrarem). None = todos os dias."""
     sub = base[base["sm_real"] < base["sm_prev"]].copy()

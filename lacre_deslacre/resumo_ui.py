@@ -7,6 +7,7 @@ import streamlit as st
 from comum.estilos import pct, pp
 from comum.graficos import grafico_taxa, grafico_volume
 from comum.tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERMELHO
+from comum import periodos
 from comum.uploads import opcao_valida
 from . import textos as tx
 from comum.idioma import bi
@@ -76,6 +77,26 @@ def _secao(base, tipo, evento, regional, freq, ini, fim, export):
     export[tx.aba_excel_resumo(tipo, evento)] = (exp, {"taxa": rot["taxa"], "meta": "目标 Meta", "pp_extra": [tx.COL_VAR]})
 
 
+def _botoes(base: pd.DataFrame, freq: str, ini, fim):
+    """Semana ou Mês: mostra os botões de períodos. Clicar em um passa a mostrar os DIAS dele; sem seleção, o ano todo
+    por semana/mês. Em Dia não há botões (nada aparece na tela)."""
+    if freq == "D":
+        return freq, ini, fim
+    sub = base if ini is None else base[(base["dia"] >= ini) & (base["dia"] <= fim)]
+    lista = periodos.lista(sub["dia"], freq)
+    if not lista:
+        return freq, ini, fim
+    chave = f"res_pil_{freq}"
+    opcao_valida(chave, lista)
+    st.caption(tx.RES_PILULA_W if freq == "W" else tx.RES_PILULA_M)
+    per = st.pills(tx.GRAN_NOMES[freq], lista, selection_mode="single", default=lista[-1], key=chave,
+                   format_func=lambda p: periodos.rotulo_curto(p, freq, com_ano=ini is None))
+    if per is None:
+        return freq, ini, fim
+    st.caption(f"{tx.RES_DIAS_DE}: {periodos.rotulo(per, freq)}")
+    return "D", per, periodos.fim(per, freq)
+
+
 def mostrar(base: pd.DataFrame, export: dict) -> None:
     """Desenha a aba inteira. Lacre primeiro, depois Deslacre; cada um com Coleta e Entrega."""
     st.caption(tx.RES_NOTA)
@@ -97,6 +118,7 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
     ano = f3.selectbox(tx.RES_ANO, opcoes_ano, index=anos.index(atual) if atual in anos else 0, key="res_ano",
                        format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
     ini, fim = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1), pd.Timestamp(year=ano, month=12, day=31))
+    freq, ini, fim = _botoes(base, freq, ini, fim)
 
     for evento in ("lacre", "deslacre"):
         st.header(bi("封车", "Lacre") if evento == "lacre" else bi("解车", "Deslacre"))
