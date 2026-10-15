@@ -1,4 +1,4 @@
-"""Logo no canto superior direito.
+"""Logo no canto superior direito, sempre visível (não rola com a página).
 
 Usa o contorno da logo (PNG transparente) como máscara e pinta com a cor certa para cada tema:
 vermelho da marca no modo claro e branco no modo escuro (light-dark() segue o tema escolhido no app).
@@ -20,13 +20,15 @@ def logo_html() -> str:
     url = f"url(data:image/png;base64,{dados})"
     return f"""
 <style>
-.logo-canto {{
-    position: fixed; top: 8px; right: 6.5rem; z-index: 999991;
+/* O cabeçalho do Streamlit fica fixo no topo (com fundo sólido) e a logo é desenhada dentro dele:
+   assim ela não desce com a rolagem e o conteúdo não passa por baixo dela. */
+[data-testid="stHeader"] {{ position: fixed !important; top: 0; left: 0; right: 0; }}
+[data-testid="stHeader"]::after {{
+    content: ""; position: absolute; top: 8px; right: 6.5rem;
     width: {LARGURA}px; height: {altura}px; pointer-events: none;
     background-color: light-dark({COR_CLARO}, {COR_ESCURO});
     -webkit-mask: {url} center / contain no-repeat; mask: {url} center / contain no-repeat;
 }}
-@media (max-width: 900px) {{ .logo-canto {{ width: {LARGURA // 2}px; height: {altura // 2}px; right: 4rem; }} }}
+@media (max-width: 900px) {{ [data-testid="stHeader"]::after {{ width: {LARGURA // 2}px; height: {altura // 2}px; right: 4rem; }} }}
 </style>
-<div class="logo-canto" role="img" aria-label="J&T Express"></div>
 """
