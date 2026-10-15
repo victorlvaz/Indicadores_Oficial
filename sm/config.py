@@ -48,8 +48,13 @@ TECHIS_STATUS_VALIDOS = ("Em Viagem", "Finalizado")
 # TECHIS: a coluna que liga o SM à viagem do JMS (Nº Embarque = Tarefa de transporte No.)
 COL_TECHIS_EMBARQUE = "Nº Embarque"
 
-# Regiões que entram nas tabelas enviadas às regionais (as demais ficam fora do total, como na planilha)
+# Regionais da planilha, na ordem dela (sempre aparecem, mesmo sem dados no período)
 REGIOES = ["RJ", "SPS", "SPE", "MG", "PR", "SPN"]
+
+# Regionais extras que entram nas tabelas, gráficos e no total, depois das da planilha (só aparecem se houver dados).
+# Hoje só o SR. As demais que existem nos dados (GP, CE, BA...) ficam de fora, como na planilha.
+# Para incluir outra, acrescente o nome na lista; para voltar às seis da planilha, deixe a lista vazia: [].
+REGIOES_EXTRAS = ["SR"]
 
 # Regras do Manual da planilha (passos 2 a 4)
 STATUS_VALIDOS = ("Concluído", "Em Trânsito")   # "Em viagem" e "Finalizado" no JMS

@@ -42,6 +42,14 @@ Mesmo banco e mesmo fluxo do Lacre/Deslacre, nas tabelas `sm_viagens` e `sm_carg
 - Arquivos enviados e ainda não salvos já entram nas tabelas (aviso na tela).
 - A aba **Resumo** tem filtro de regional, visão por dia/semana/mês e ano (padrão: ano corrente), com Coleta e Entrega.
 
+## Taxa de Uso de APP (支线打卡率)
+Mesmo relatório consolidado do Lacre/Deslacre, mesma lógica de histórico (botão "Salvar no histórico", tabelas
+`app_viagens`, `app_cargas`, `app_transportadores`). Taxa = (check-outs + check-ins feitos) / (viagens x 2); Coleta agrupa
+pela regional de saída, Entrega pela de chegada; meta 95%. Regras (passo a passo do Documents): só Concluído e Em Trânsito,
+excluir rotas do mesmo SC (coletas e entregas), excluir Franqueados e, se o transportador vier vazio, usar o último valor
+conhecido da viagem. Todas as regionais (inclusive GP, CE, BA e SR) entram no total, como na planilha do Lucas.
+Validar: `python validar_app_uso.py "Taxa_uso_de_APP.xlsx" ["relatorio_bruto.xls"]`.
+
 ## Período e comparação
 - **Período de análise:** Dia, Semana (segunda a domingo), Mês ou Ano, mais a opção *Todos (acumulado)*.
 - **Comparar com:** *Período anterior* (dia anterior, semana anterior, mês anterior, ano anterior) ou

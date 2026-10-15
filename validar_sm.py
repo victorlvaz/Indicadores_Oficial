@@ -53,6 +53,8 @@ def data_excel(v):
 
 def main(caminho: str, exato: bool = True) -> int:
     """exato=True: reproduz a planilha (Entrega sem limite e Nº Embarque com TAB não conta)."""
+    import sm.config as _cfg
+    _cfg.REGIOES_EXTRAS = [] if exato else _cfg.REGIOES_EXTRAS      # a planilha só tem as seis regionais
     wb = openpyxl.load_workbook(caminho, data_only=True)
     techis = ler_techis(caminho, sheet_name=ABA_TECHIS)
     if not exato:

@@ -14,6 +14,7 @@ import io
 import pandas as pd
 
 from comum import periodos
+from . import config as cfg
 from . import textos as tx
 from .config import (APOIO, COL_JMS, PREVISTO_PELA_ROTA, COL_JMS_OPCIONAIS, COL_TECHIS_EMBARQUE, COLUNAS_CALCULADAS,
                      COLUNAS_REMOVER, PEDIDO_MAE_MINIMO, REGIOES, STATUS_VALIDOS, TECHIS_COLUNAS,
@@ -254,13 +255,21 @@ def aplicar_techis(base: pd.DataFrame, contagem: pd.Series, limitar: bool | dict
 
 
 # ---------- indicadores ----------
+def regioes_da(df: pd.DataFrame) -> list:
+    """Regionais da planilha + as extras de config.REGIOES_EXTRAS que aparecem nos dados."""
+    if df.empty or not cfg.REGIOES_EXTRAS:
+        return list(REGIOES)
+    presentes = set(df["regiao"].dropna().astype(str).str.strip())
+    return list(REGIOES) + [r for r in cfg.REGIOES_EXTRAS if r in presentes and r not in REGIOES]
+
+
 def tabela_periodo(base: pd.DataFrame, tipo: str, ini=None, fim=None) -> pd.DataFrame:
     """Equivalente às abas SM COLETA/ENTREGA 状态统计: previsto, realizado e % por regional de origem.
     ini/fim = período (inclusive); None = "Todos": acumulado de todos os dias."""
     sub = base[base["tipo"] == tipo]
     if ini is not None:
         sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim if fim is not None else ini))]
-    g = sub.groupby("regiao")[["sm_prev", "sm_real"]].sum().reindex(REGIOES, fill_value=0)
+    g = sub.groupby("regiao")[["sm_prev", "sm_real"]].sum().reindex(regioes_da(sub), fill_value=0)
     g = g.rename(columns={"sm_prev": "prev", "sm_real": "real"})
     g.index.name = "regiao"
     g = g.reset_index()
@@ -297,7 +306,8 @@ def rotular_tabela(tab: pd.DataFrame) -> pd.DataFrame:
 def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataFrame:
     """Aba Tendência: % por período (dia, semana, mês ou ano) e regional + acumulado (média das taxas dos períodos,
     como na planilha) + variação do último período vs. o anterior. `ate` = último dia considerado."""
-    sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    sub = base[base["tipo"] == tipo]
+    sub = sub[sub["regiao"].isin(regioes_da(sub))]
     if ate is not None:
         sub = sub[sub["dia"] <= pd.Timestamp(ate)]
     if sub.empty:
@@ -317,7 +327,7 @@ def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.Da
     out.insert(0, tx.COL_VARIACAO,
                out.iloc[:, -1] - out.iloc[:, -2] if out.shape[1] >= 2 else float("nan"))
     out.insert(1, tx.COL_ACUMULADO, diaria.mean(axis=1, skipna=True))
-    out = out.loc[[tx.TOTAL] + [r for r in REGIOES if r in out.index]]
+    out = out.loc[[tx.TOTAL] + [r for r in regioes_da(sub) if r in out.index]]
     out.index.name = tx.COL_REGIAO
     return out.reset_index()
 
@@ -325,7 +335,8 @@ def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.Da
 def resumo(base: pd.DataFrame, tipo: str, freq: str = "W", regional: str | None = None, ini=None, fim=None) -> pd.DataFrame:
     """Previsto, realizado e taxa por período para uma regional (None = todas as regionais do relatório).
     Períodos sem nenhuma viagem entram com taxa vazia (lacuna visível no gráfico)."""
-    sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    sub = base[base["tipo"] == tipo]
+    sub = sub[sub["regiao"].isin(regioes_da(sub))]
     if regional:
         sub = sub[sub["regiao"] == regional]
     if ini is not None:
@@ -345,7 +356,8 @@ def resumo(base: pd.DataFrame, tipo: str, freq: str = "W", regional: str | None 
 
 def resumo_regionais(base: pd.DataFrame, tipo: str, freq: str = "W", ini=None, fim=None) -> pd.DataFrame:
     """Previsto, realizado e taxa por regional e por período (mini-gráficos). Períodos sem viagem ficam com taxa vazia."""
-    sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    sub = base[base["tipo"] == tipo]
+    sub = sub[sub["regiao"].isin(regioes_da(sub))]
     if ini is not None:
         sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim))]
     cols = ["regiao", "inicio", "periodo", "prev", "real", "taxa"]
@@ -353,7 +365,7 @@ def resumo_regionais(base: pd.DataFrame, tipo: str, freq: str = "W", ini=None, f
         return pd.DataFrame(columns=cols)
     g = sub.groupby(["regiao", periodos.inicio(sub["dia"], freq)])[["sm_prev", "sm_real"]].sum()
     todos = periodos.completos(g.index.get_level_values(1).min(), g.index.get_level_values(1).max(), freq)
-    regs = [r for r in REGIOES if r in set(sub["regiao"])]
+    regs = [r for r in regioes_da(sub) if r in set(sub["regiao"])]
     g = g.reindex(pd.MultiIndex.from_product([regs, todos], names=["regiao", "inicio"]), fill_value=0).reset_index()
     g = g.rename(columns={"sm_prev": "prev", "sm_real": "real"})
     g["taxa"] = (g["real"] / g["prev"]).where(g["prev"] > 0)

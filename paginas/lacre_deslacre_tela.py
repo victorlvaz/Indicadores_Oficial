@@ -94,7 +94,9 @@ lista = periodos.lista(base["dia"], gran)
 opcoes = lista + [None]                                    # None = "Todos"
 chave_per = f"lac_per_{gran}"
 opcao_valida(chave_per, opcoes)
-ini = st.sidebar.selectbox(tx.PERIODO[gran], opcoes, index=len(lista) - 1, key=chave_per,
+if chave_per not in st.session_state:                      # valor inicial pelo session_state (sem 'index': evita o aviso)
+    st.session_state[chave_per] = opcoes[len(lista) - 1]
+ini = st.sidebar.selectbox(tx.PERIODO[gran], opcoes, key=chave_per,
                            format_func=lambda p: tx.TODOS if p is None else periodos.rotulo(p, gran))
 fim = None if ini is None else periodos.fim(ini, gran)
 modo_comp = st.sidebar.radio(tx.COMPARAR, ["ant", "ano"], key="lac_comp",

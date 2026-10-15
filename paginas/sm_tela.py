@@ -200,7 +200,9 @@ padrao = validos[-1] if validos else len(lista) - 1
 opcoes = lista + [None]                                     # None = "Todos"
 chave_per = f"sm_per_{gran}"
 opcao_valida(chave_per, opcoes)
-ini = st.sidebar.selectbox(tx.DIA if gran == "D" else tx.PERIODO[gran], opcoes, index=padrao, key=chave_per,
+if chave_per not in st.session_state:                      # valor inicial pelo session_state (sem 'index': evita o aviso)
+    st.session_state[chave_per] = opcoes[padrao]
+ini = st.sidebar.selectbox(tx.DIA if gran == "D" else tx.PERIODO[gran], opcoes, key=chave_per,
                            format_func=lambda p: tx.TODOS if p is None else periodos.rotulo(p, gran))
 fim = None if ini is None else periodos.fim(ini, gran)
 modo_comp = st.sidebar.radio(tx.COMPARAR, ["ant", "ano"], key="sm_comp",
@@ -276,7 +278,7 @@ with abas[3]:
         tipos_sel = c1.multiselect(tx.PEND_TIPO, list(TIPOS), default=list(TIPOS),
                                    format_func=lambda t: f"{tx.TIPO_ZH[t]} {tx.TIPO_PT[t]}", key="sm_p_tipo")
         regs = sorted(p["regiao"].unique(), key=lambda r: (r not in REGIOES, REGIOES.index(r) if r in REGIOES else 0, r))
-        regs_sel = c2.multiselect(tx.PEND_REGIOES, regs, default=[r for r in regs if r in REGIOES], key="sm_p_reg")
+        regs_sel = c2.multiselect(tx.PEND_REGIOES, regs, default=regs, key="sm_p_reg")
         p = p[p["tipo"].isin(tipos_sel) & p["regiao"].isin(regs_sel)]
         primeiro = ["tipo", "regiao", "dia", "viagem", "id", "partida", "chegada", "placa", "transportador",
                     "sm_prev", "sm_real", "faltam", "sm_contagem"]

@@ -29,4 +29,14 @@ RELATORIOS = [
                            "Rastreamento efetivo dos SMs por regional (Coleta e Entrega), com dados do JMS e do "
                            "TECHIS, tendência e viagens sem SM."),
     },
+    {
+        "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("支线打卡率", "Taxa de Uso de APP"),
+        "arquivo": "paginas/app_uso_tela.py",
+        "url": "uso-app",
+        "icone": ":material/smartphone:",
+        "descricao": frase("按区域统计司机 APP 打卡率（集货与散货），含排名、目标、趋势与汇总。",
+                           "Taxa de uso do APP pelo motorista (check-out e check-in) por regional (Coleta e Entrega), "
+                           "ranking, meta, tendência e resumo."),
+    },
 ]
