@@ -35,10 +35,14 @@ def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]]) -> bytes:
                 cel.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
             for i, c in enumerate(colunas, start=1):
-                eh_pct = df[c].dtype.kind == "f" and (c == cols.get("meta") or c == cols.get("taxa") or not cols)
+                eh_pct = df[c].dtype.kind == "f" and (c == cols.get("meta") or c == cols.get("taxa")
+                                                     or c in cols.get("pct_extra", ()) or not cols)
                 if eh_pct:
                     for cel in ws[get_column_letter(i)][1:]:
                         cel.number_format = "0.00%"
+                if c in cols.get("pp_extra", ()):                  # valores já em pontos percentuais
+                    for cel in ws[get_column_letter(i)][1:]:
+                        cel.number_format = '+0.00" p.p.";-0.00" p.p.";0.00" p.p."'
                 ws.column_dimensions[get_column_letter(i)].width = max(10, min(len(str(c)) // 2 + 6, 28))
 
             if ws.max_row >= 2 and not cols.get("sem_pct"):                                   # linha de total (1ª): cinza e negrito

@@ -72,3 +72,8 @@ def opcao_valida(chave: str, opcoes: list) -> None:
     """Se o valor guardado de um seletor não existe mais nas opções (ex.: outro arquivo), esquece o valor."""
     if chave in st.session_state and st.session_state[chave] not in opcoes:
         del st.session_state[chave]
+
+
+def esvaziar(chave: str) -> None:
+    """Remove todos os arquivos guardados de um uploader (ex.: depois de salvar no banco)."""
+    _loja().get(chave, {}).clear()

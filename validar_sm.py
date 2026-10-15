@@ -9,6 +9,8 @@ regras e compara:
   1) previsto / realizado por regional nas abas SM COLETA/ENTREGA 状态统计 (dia da célula F1)
   2) as taxas diárias da aba Tendência
 A comparação usa o limite do realizado igual à planilha (Coleta limitada, Entrega não).
+No modo planilha o SM previsto vem só da coluna D (como a planilha antiga); no modo app vale a regra nova de 14/10:
+a rota com mais trechos entre a coluna G "Nome da rota" e a D "Nome da viagem" (G vazia -> D).
 """
 import sys
 import warnings
@@ -59,7 +61,7 @@ def main(caminho: str, exato: bool = True) -> int:
     partes = []
     for tipo, aba in ABAS_BASE.items():
         bruto = ler_planilha(caminho, sheet_name=aba).drop(columns=["SM realizado"], errors="ignore")  # recalcula do zero
-        b, d = preparar_jms(bruto, tipo)
+        b, d = preparar_jms(bruto, tipo, prev_pela_rota=not exato)   # modo planilha = só a coluna D (regra antiga)
         print(f"Diagnóstico {tipo}:", d)
         partes.append(b)
     base = aplicar_techis(juntar(partes), cont, limitar=LIMITE_DA_PLANILHA if exato else True)
@@ -113,6 +115,6 @@ if __name__ == "__main__":
         sys.exit(2)
     print("== Modo planilha (deve dar 0 divergências) ==")
     r = main(caminho, exato=True)
-    print("\n== Modo app (limite nas duas + embarque com TAB contado): diferenças esperadas ==")
+    print("\n== Modo app (previsto pela rota com mais trechos, limite nas duas, embarque com TAB contado): diferenças esperadas ==")
     main(caminho, exato=False)
     sys.exit(r)

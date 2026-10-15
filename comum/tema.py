@@ -18,13 +18,11 @@ CSS_GLOBAL = """
 [data-testid="stTab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"] {
     background-color: rgba(128,128,128,.22) !important;
 }
-[data-testid="stTab"][aria-selected="true"] p, button[data-baseweb="tab"][aria-selected="true"] p {
-    color: #31333F !important; font-weight: 700 !important;
-}
-[data-testid="stTab"][aria-selected="true"] { color: #31333F !important; }
-@media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) [data-testid="stTab"][aria-selected="true"],
-    :root:not([data-theme="light"]) [data-testid="stTab"][aria-selected="true"] p { color: #FAFAFA !important; }
+/* Fonte da aba selecionada: PRETA no tema claro, BRANCA no tema escuro.
+   light-dark() segue o tema ativo no app (não o modo do sistema operacional). */
+[data-testid="stTab"][aria-selected="true"], [data-testid="stTab"][aria-selected="true"] *,
+button[data-baseweb="tab"][aria-selected="true"], button[data-baseweb="tab"][aria-selected="true"] * {
+    color: light-dark(#000000, #FFFFFF) !important; font-weight: 700 !important;
 }
 [data-testid="stTab"]:hover, button[data-baseweb="tab"]:hover { background-color: rgba(128,128,128,.12) !important; }
 [data-testid="stTab"][aria-selected="true"] > div:not([data-testid]), div[data-baseweb="tab-highlight"] {

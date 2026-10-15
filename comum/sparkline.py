@@ -60,7 +60,8 @@ def _svg(valores: list, largura=150, altura=34, margem=7, vmin=None, vmax=None) 
             f'src="data:image/svg+xml;base64,{dados}">')
 
 
-def tabela_tendencia_html(t, n_dias: int = 6, n_valores: int = 2, escala_comum: bool = False) -> str:
+def tabela_tendencia_html(t, n_dias: int = 6, n_valores: int = 2, escala_comum: bool = False,
+                          unidade: tuple = ("天", "dias")) -> str:
     """t = saída de calculos.tendencia(): colunas [região, variação, acumulado, dd/mm, dd/mm, ...].
     Mostra os últimos `n_valores` dias em % e a linha dos últimos `n_dias` dias."""
     col_regiao = t.columns[0]
@@ -80,8 +81,8 @@ def tabela_tendencia_html(t, n_dias: int = 6, n_valores: int = 2, escala_comum: 
     chines = _NUM_CHINES.get(len(usados), str(len(usados)))
     cab = f'<th style="{base}{topo}text-align:left">{html.escape(str(col_regiao))}</th>'
     cab += "".join(f'<th style="{base}{topo}font-weight:700">{html.escape(str(d))}</th>' for d in mostrados)
-    cab += (f'<th style="{base}{topo}font-weight:700">近{chines}天趋势 '
-            f'<span style="font-weight:400;font-size:12px">Últimos {len(usados)} dias</span></th>')
+    cab += (f'<th style="{base}{topo}font-weight:700">近{chines}{unidade[0]}趋势 '
+            f'<span style="font-weight:400;font-size:12px">Últimos {len(usados)} {unidade[1]}</span></th>')
 
     linhas = []
     for pos, i in enumerate(t.index):

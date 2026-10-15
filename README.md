@@ -9,6 +9,46 @@ python -m streamlit run app.py
 ```
 (rode dentro da pasta do projeto; no Windows, se `python` não funcionar, use `py`)
 
+## Histórico em banco de dados (Lacre / Deslacre)
+Os relatórios agora são **enviados uma vez** e ficam gravados num banco; a tela lê sempre do histórico.
+1. Na barra lateral, envie o relatório consolidado e clique em **Salvar no histórico**.
+   - Reenviar o mesmo dia só **atualiza** as viagens (chave: ID + estação de chegada + horário planejado); não duplica e
+     não apaga viagens que só estavam no envio anterior. Depois de salvar, o arquivo sai da lista.
+   - A aba *Base / Diagnóstico* mostra o histórico de cargas (arquivo, quantas linhas novas e quantas atualizadas).
+2. **Onde fica o banco:** por padrão, um arquivo SQLite local em `dados/historico.db` (não vai para o GitHub).
+   Para usar o servidor da empresa, informe só a URL de conexão, sem mudar código:
+   - arquivo `.streamlit/secrets.toml`:
+     ```
+     [banco]
+     url = "postgresql+psycopg2://usuario:senha@servidor:5432/indicadores"
+     ```
+     ou a variável de ambiente `INDICADORES_DB_URL`. Exemplos para SQL Server e MySQL estão em `comum/banco.py`.
+   - Instale o driver do banco (`psycopg2-binary`, `pyodbc` ou `pymysql`). As tabelas `lacre_viagens` e `lacre_cargas`
+     são criadas sozinhas (o usuário precisa de permissão para criar tabelas).
+   - Para levar o que já está no SQLite para o servidor, é só reenviar os relatórios (ou pedir a migração).
+3. O que fica guardado é a base **já tratada** (depois das regras de exclusão). As regras agora são fixas, em
+   `lacre_deslacre/config.py` — não há mais caixas de seleção na tela.
+4. **Backup:** com SQLite, copie `dados/historico.db`. No servidor, o backup é da TI.
+5. No Streamlit Community Cloud o disco é temporário: SQLite lá perderia o histórico. Use o servidor da empresa.
+
+## Histórico do SM (SM状态统计)
+Mesmo banco e mesmo fluxo do Lacre/Deslacre, nas tabelas `sm_viagens` e `sm_cargas`.
+- Envie os relatórios JMS (Coleta e/ou Entrega) **e a extração do TECHIS** e clique em **Salvar no histórico**
+  (sem o TECHIS o botão não salva, porque os SMs realizados ficariam em 0). Depois de salvar, os arquivos saem da lista.
+- Chave da viagem: tipo + ID da tarefa. Reenviar atualiza a viagem; a contagem de SMs do TECHIS fica com o **maior**
+  valor entre o já gravado e o do arquivo novo (um TECHIS mais recente pode não cobrir dias antigos).
+- O SM realizado nunca passa do previsto (regra fixa); o previsto usa a coluna G, ou a D se a G estiver vazia, e vale a
+  que tiver mais trechos. Não há mais caixas de regras na tela.
+- Arquivos enviados e ainda não salvos já entram nas tabelas (aviso na tela).
+- A aba **Resumo** tem filtro de regional, visão por dia/semana/mês e ano (padrão: ano corrente), com Coleta e Entrega.
+
+## Período e comparação
+- **Período de análise:** Dia, Semana (segunda a domingo), Mês ou Ano, mais a opção *Todos (acumulado)*.
+- **Comparar com:** *Período anterior* (dia anterior, semana anterior, mês anterior, ano anterior) ou
+  *Mesmo período do ano passado*. As tabelas ganham a taxa comparada e a variação em **pontos percentuais** (▲ subiu,
+  ▼ caiu em vermelho). Com *Todos* não há comparação.
+- As abas de **tendência** seguem o período escolhido (dias, semanas, meses ou anos).
+
 ## Estrutura
 ```
 app.py                       entrada: monta o menu a partir de relatorios.py
@@ -17,9 +57,14 @@ relatorios.py                lista dos relatórios (grupo, título, arquivo da p
 paginas/
   inicio.py                  página inicial com atalhos
   lacre_deslacre_tela.py     tela do Lacre/Deslacre
+  sm_tela.py                 tela do SM
 lacre_deslacre/              regras e cálculos do Lacre/Deslacre
   config.py  calculos.py  textos.py  apoio/*.csv
+  historico.py  gravar/ler o histórico no banco     resumo_ui.py  aba Resumo
+sm/                          regras e cálculos do SM (config, calculos, textos, historico, resumo_ui, apoio/*.csv)
 comum/                       partes reaproveitadas por todos os relatórios
+  banco.py      conexão com o banco (SQLite por padrão, URL da empresa por configuração)
+  periodos.py   dia/semana/mês/ano e comparação      graficos.py  gráficos vermelho/cinza
   tema.py       cores (VERMELHO = "#E60000")
   idioma.py     bi(), frase() e cabecalho() para os textos em chinês + português
   estilos.py    cor de meta nas tabelas      exportar.py   Excel

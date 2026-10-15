@@ -14,3 +14,8 @@ venv/
 !lacre_deslacre/apoio/*.csv
 
 .streamlit/secrets.toml
+
+# Histórico local (dados reais): nunca subir para o GitHub
+dados/
+*.db
+*.sqlite
