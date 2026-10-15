@@ -2,6 +2,7 @@
 
 Equivalência com a planilha finalizada (abas 支线跟踪查询集货COLETA / 散货ENTREGA):
   ROTA / Quantidade de trechos / SM previsto  -> sm_prev = nº de pontos da rota - 1
+      (rota = a de MAIS trechos entre a coluna G "Nome da rota" e a D "Nome da viagem"; G vazia -> D. Regra de 14/10, ver config.PREVISTO_PELA_ROTA)
       (a planilha usa LEN(rota) + tabela 索引; dá o mesmo resultado nas 6 regionais do relatório,
        e não quebra quando o código da unidade tem 3 letras)
   SM realizado  -> nº de linhas do TECHIS com Nº Embarque = Tarefa de transporte No. (limitado ao previsto)
@@ -12,8 +13,9 @@ import io
 
 import pandas as pd
 
+from comum import periodos
 from . import textos as tx
-from .config import (APOIO, COL_JMS, COL_JMS_OPCIONAIS, COL_TECHIS_EMBARQUE, COLUNAS_CALCULADAS,
+from .config import (APOIO, COL_JMS, PREVISTO_PELA_ROTA, COL_JMS_OPCIONAIS, COL_TECHIS_EMBARQUE, COLUNAS_CALCULADAS,
                      COLUNAS_REMOVER, PEDIDO_MAE_MINIMO, REGIOES, STATUS_VALIDOS, TECHIS_COLUNAS,
                      TECHIS_STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO)
 
@@ -113,9 +115,20 @@ def sm_previsto(viagem: pd.Series) -> pd.Series:
     return (partes.str.len() - 3).clip(lower=1)
 
 
+def rota_usada(viagem: pd.Series, rota: pd.Series) -> pd.Series:
+    """Rota que define o SM previsto (regra de 14/10, confirmada com o Renan).
+    Cada hífen separa um trecho. Coluna G (Nome da rota) vazia -> vale a D (Nome da viagem).
+    As duas preenchidas e com nº de trechos diferente -> vale a que tiver MAIS trechos (empate -> G)."""
+    d = viagem.fillna("").astype(str).str.strip()
+    g = rota.fillna("").astype(str).str.strip()
+    g = g.mask(g.str.lower().isin(["nan", "none", "nat"]), "")
+    usar_g = g.ne("") & (g.str.count("-") >= d.str.count("-"))
+    return g.where(usar_g, d)
+
+
 def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filtro_status=True,
                  filtro_mesmo_sc=True, filtro_ponto_coleta=True, filtro_franqueado=True,
-                 filtro_pedido_mae=True):
+                 filtro_pedido_mae=True, prev_pela_rota=PREVISTO_PELA_ROTA):
     """Retorna (base tratada, diagnóstico). tipo = "COLETA" ou "ENTREGA"."""
     apoio = apoio or carregar_apoio()
     df = df.copy()
@@ -134,7 +147,7 @@ def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filt
     b = pd.concat([b, df], axis=1)          # colunas originais do JMS seguem junto (para exportar a base)
     b["sm_real_hist"] = real_hist
 
-    for c in ("id", "status", "viagem", "tipo_transportador", "partida", "regiao"):
+    for c in ("id", "status", "viagem", "rota", "tipo_transportador", "partida", "regiao"):
         b[c] = b[c].fillna("").astype(str).str.strip()
     b["tipo"] = tipo
     b["saida_plan"] = pd.to_datetime(b["saida_plan"], errors="coerce", format="mixed")
@@ -167,12 +180,15 @@ def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filt
         diag[tx.DIAG["franqueado"]] = int(fr.sum())
         b = b[~fr]
 
-    b["sm_prev"] = sm_previsto(b["viagem"]).astype(int)
+    b["rota_usada"] = rota_usada(b["viagem"], b["rota"]) if prev_pela_rota else b["viagem"]
+    b["sm_prev"] = sm_previsto(b["rota_usada"]).astype(int)
     diag[tx.DIAG["usadas"]] = len(b)
+    if prev_pela_rota:
+        diag[tx.DIAG["rota_vazia"]] = int((b["rota"].eq("") | b["rota"].str.lower().isin(["nan", "none"])).sum())
     return b[INTERNAS + originais].reset_index(drop=True), diag
 
 
-INTERNAS = ["tipo", "id", "status", "viagem", "tipo_transportador", "transportador", "pedido_mae",
+INTERNAS = ["tipo", "id", "status", "viagem", "rota", "rota_usada", "tipo_transportador", "transportador", "pedido_mae",
             "partida", "chegada", "saida_plan", "placa", "regiao", "regiao_destino", "dia", "sm_prev",
             "sm_real_hist"]
 
@@ -189,7 +205,11 @@ def base_para_exportar(base: pd.DataFrame, tipo: str) -> pd.DataFrame:
     internas = set(INTERNAS + ["sm_contagem", "sm_real"])
     originais = [c for c in sub.columns if c not in internas and sub[c].notna().any()]
     out = sub[originais].copy()
-    out[COLUNAS_CALCULADAS["rota"]] = sub["viagem"].str.split("-").str[:-2].str.join("-")
+    for k, nomes in COL_JMS.items():                    # linhas vindas do banco não têm as colunas originais do JMS
+        if k in sub.columns:
+            n = nomes[0]
+            out[n] = out[n].where(out[n].notna(), sub[k]) if n in out.columns else sub[k]
+    out[COLUNAS_CALCULADAS["rota"]] = sub["rota_usada"].str.split("-").str[:-2].str.join("-")
     out[COLUNAS_CALCULADAS["sm_prev"]] = sub["sm_prev"]
     if "sm_real" in sub:
         out[COLUNAS_CALCULADAS["sm_real"]] = sub["sm_real"]
@@ -234,11 +254,12 @@ def aplicar_techis(base: pd.DataFrame, contagem: pd.Series, limitar: bool | dict
 
 
 # ---------- indicadores ----------
-def tabela_dia(base: pd.DataFrame, tipo: str, dia) -> pd.DataFrame:
-    """Equivalente às abas SM COLETA/ENTREGA 状态统计: previsto, realizado e % por regional de origem."""
+def tabela_periodo(base: pd.DataFrame, tipo: str, ini=None, fim=None) -> pd.DataFrame:
+    """Equivalente às abas SM COLETA/ENTREGA 状态统计: previsto, realizado e % por regional de origem.
+    ini/fim = período (inclusive); None = "Todos": acumulado de todos os dias."""
     sub = base[base["tipo"] == tipo]
-    if dia is not None:                      # None = "Todos": acumulado de todos os dias
-        sub = sub[sub["dia"] == pd.Timestamp(dia)]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim if fim is not None else ini))]
     g = sub.groupby("regiao")[["sm_prev", "sm_real"]].sum().reindex(REGIOES, fill_value=0)
     g = g.rename(columns={"sm_prev": "prev", "sm_real": "real"})
     g.index.name = "regiao"
@@ -253,24 +274,46 @@ def tabela_dia(base: pd.DataFrame, tipo: str, dia) -> pd.DataFrame:
     return pd.concat([total, g], ignore_index=True)
 
 
+def tabela_dia(base: pd.DataFrame, tipo: str, dia) -> pd.DataFrame:
+    """Um dia só (ou None = todos). Mantido para o validador."""
+    return tabela_periodo(base, tipo, dia, dia)
+
+
+def comparar(atual: pd.DataFrame, comparada: pd.DataFrame) -> pd.DataFrame:
+    """Acrescenta a taxa do período comparado e a variação (fração: 0,0125 = +1,25 p.p.)."""
+    taxa = comparada.set_index("regiao")["taxa"]
+    out = atual.copy()
+    out["taxa_comp"] = out["regiao"].map(taxa)
+    out["variacao"] = out["taxa"] - out["taxa_comp"]
+    return out
+
+
 def rotular_tabela(tab: pd.DataFrame) -> pd.DataFrame:
     return tab.rename(columns={"regiao": tx.COL_REGIAO, "prev": tx.COL_PREV, "real": tx.COL_REAL,
-                               "taxa": tx.COL_TAXA, "ranking": tx.COL_RANK})
+                               "taxa": tx.COL_TAXA, "ranking": tx.COL_RANK,
+                               "taxa_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
 
 
-def tendencia(base: pd.DataFrame, tipo: str) -> pd.DataFrame:
-    """Aba Tendência: % diário por regional + acumulado (média das taxas diárias, como na planilha)
-    + variação do último dia vs. o anterior. Mesmo formato da tendência do Lacre/Deslacre."""
+def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataFrame:
+    """Aba Tendência: % por período (dia, semana, mês ou ano) e regional + acumulado (média das taxas dos períodos,
+    como na planilha) + variação do último período vs. o anterior. `ate` = último dia considerado."""
     sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    if ate is not None:
+        sub = sub[sub["dia"] <= pd.Timestamp(ate)]
     if sub.empty:
         return pd.DataFrame()
-    g = sub.groupby(["regiao", "dia"])[["sm_prev", "sm_real"]].sum()
-    diaria = (g["sm_real"] / g["sm_prev"]).unstack("dia")
-    t = sub.groupby("dia")[["sm_prev", "sm_real"]].sum()
+    sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
+    sub = sub[sub["per"].isin(sorted(sub["per"].unique())[-periodos.JANELA[freq]:])]
+    g = sub.groupby(["regiao", "per"])[["sm_prev", "sm_real"]].sum()
+    diaria = (g["sm_real"] / g["sm_prev"]).unstack("per")
+    t = sub.groupby("per")[["sm_prev", "sm_real"]].sum()
     diaria.loc[tx.TOTAL] = t["sm_real"] / t["sm_prev"]
 
     out = diaria.copy()
-    out.columns = [d.strftime("%d/%m") for d in out.columns]
+    curtos = [periodos.rotulo_curto(d, freq) for d in out.columns]
+    if len(set(curtos)) < len(curtos):
+        curtos = [periodos.rotulo_curto(d, freq, com_ano=True) for d in out.columns]
+    out.columns = curtos
     out.insert(0, tx.COL_VARIACAO,
                out.iloc[:, -1] - out.iloc[:, -2] if out.shape[1] >= 2 else float("nan"))
     out.insert(1, tx.COL_ACUMULADO, diaria.mean(axis=1, skipna=True))
@@ -279,11 +322,32 @@ def tendencia(base: pd.DataFrame, tipo: str) -> pd.DataFrame:
     return out.reset_index()
 
 
-def pendentes(base: pd.DataFrame, dia) -> pd.DataFrame:
-    """Viagens do dia com SM realizado abaixo do previsto (para as regionais cobrarem)."""
+def resumo(base: pd.DataFrame, tipo: str, freq: str = "W", regional: str | None = None, ini=None, fim=None) -> pd.DataFrame:
+    """Previsto, realizado e taxa por período para uma regional (None = todas as regionais do relatório).
+    Períodos sem nenhuma viagem entram com taxa vazia (lacuna visível no gráfico)."""
+    sub = base[(base["tipo"] == tipo) & base["regiao"].isin(REGIOES)]
+    if regional:
+        sub = sub[sub["regiao"] == regional]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim))]
+    if sub.empty:
+        return pd.DataFrame(columns=["inicio", "periodo", "prev", "real", "taxa", "variacao"])
+    g = sub.groupby(periodos.inicio(sub["dia"], freq))[["sm_prev", "sm_real"]].sum()
+    g = g.rename(columns={"sm_prev": "prev", "sm_real": "real"})
+    g = g.reindex(periodos.completos(g.index.min(), g.index.max(), freq), fill_value=0)
+    g["taxa"] = (g["real"] / g["prev"]).where(g["prev"] > 0)
+    g["variacao"] = g["taxa"].diff()
+    anos = {d.year for d in g.index}
+    g["periodo"] = [periodos.rotulo_curto(d, freq, com_ano=len(anos) > 1) for d in g.index]
+    g.index.name = "inicio"
+    return g.reset_index()[["inicio", "periodo", "prev", "real", "taxa", "variacao"]]
+
+
+def pendentes(base: pd.DataFrame, ini=None, fim=None) -> pd.DataFrame:
+    """Viagens do período com SM realizado abaixo do previsto (para as regionais cobrarem). None = todos os dias."""
     sub = base[base["sm_real"] < base["sm_prev"]].copy()
-    if dia is not None:
-        sub = sub[sub["dia"] == pd.Timestamp(dia)]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim if fim is not None else ini))]
     sub["faltam"] = sub["sm_prev"] - sub["sm_real"]
     return sub.sort_values(["tipo", "regiao", "saida_plan"]).reset_index(drop=True)
 

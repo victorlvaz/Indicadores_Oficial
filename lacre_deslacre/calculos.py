@@ -1,7 +1,7 @@
 """Leitura, tratamento e regras dos indicadores (sem Streamlit)."""
 import pandas as pd
 
-from . import textos as tx
+from . import periodos, textos as tx
 from .config import (APOIO, COL, INDICADORES, METAS, PEDIDO_MAE_MINIMO, ORDEM_TENDENCIA, REGIOES, ROTULOS,
                     STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO)
 
@@ -99,12 +99,13 @@ def _regioes(base: pd.DataFrame, coluna: str) -> list[str]:
     return list(REGIOES) + extras
 
 
-def tabela_dia(base: pd.DataFrame, tipo: str, evento: str, dia) -> pd.DataFrame:
-    """Equivalente às abas 集货/散货 封车/解车: previsto, realizado, taxa, meta e ranking por região."""
+def tabela_periodo(base: pd.DataFrame, tipo: str, evento: str, ini=None, fim=None) -> pd.DataFrame:
+    """Equivalente às abas 集货/散货 封车/解车: previsto, realizado, taxa, meta e ranking por região.
+    ini/fim = período (inclusive); None = "Todos": acumulado de todos os dias."""
     cfg = INDICADORES[(tipo, evento)]
     sub = base[base["tipo_linha"] == tipo]
-    if dia is not None:                      # None = "Todos": acumulado de todos os dias
-        sub = sub[sub["dia"] == pd.Timestamp(dia)]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim if fim is not None else ini))]
     g = sub.groupby(cfg["regiao_col"])[cfg["flag"]].agg(prev="size", real="sum").reindex(_regioes(sub, cfg["regiao_col"]), fill_value=0)
     g.index.name = "regiao"
     g = g.reset_index()
@@ -122,30 +123,55 @@ def tabela_dia(base: pd.DataFrame, tipo: str, evento: str, dia) -> pd.DataFrame:
     return out
 
 
+def tabela_dia(base: pd.DataFrame, tipo: str, evento: str, dia) -> pd.DataFrame:
+    """Um dia só (ou None = todos). Mantido para os validadores."""
+    return tabela_periodo(base, tipo, evento, dia, dia)
+
+
+def comparar(atual: pd.DataFrame, comparada: pd.DataFrame) -> pd.DataFrame:
+    """Acrescenta à tabela do período a taxa do período comparado e a variação (em pontos percentuais,
+    como fração: 0,0125 = +1,25 p.p.). Região sem dado no período comparado fica vazia."""
+    taxa = comparada.set_index("regiao")["taxa"]
+    out = atual.copy()
+    out["taxa_comp"] = out["regiao"].map(taxa)
+    out["variacao"] = out["taxa"] - out["taxa_comp"]
+    return out
+
+
 def rotular_tabela(tab: pd.DataFrame, tipo: str, evento: str) -> pd.DataFrame:
     cfg, rot = INDICADORES[(tipo, evento)], ROTULOS[evento]
     return tab.rename(columns={
         "n": "序号 Nº", "regiao": cfg["regiao_rot"], "prev": rot["prev"], "real": rot["real"],
-        "taxa": rot["taxa"], "meta": "目标 Meta", "ranking": "排名 Ranking"})
+        "taxa": rot["taxa"], "meta": "目标 Meta", "ranking": "排名 Ranking",
+        "taxa_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
 
 
-def tendencia(base: pd.DataFrame, tipo: str, evento: str) -> pd.DataFrame:
-    """Taxa diária por região + acumulado do período + variação do último dia vs. anterior."""
+def tendencia(base: pd.DataFrame, tipo: str, evento: str, freq: str = "D", ate=None) -> pd.DataFrame:
+    """Taxa por período (dia, semana, mês ou ano) e região + acumulado da janela + variação do último período
+    contra o anterior. `ate` = último dia considerado (None = tudo)."""
     cfg = INDICADORES[(tipo, evento)]
     sub = base[base["tipo_linha"] == tipo]
+    if ate is not None:
+        sub = sub[sub["dia"] <= pd.Timestamp(ate)]
     if sub.empty:
         return pd.DataFrame()
+    sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
+    recentes = sorted(sub["per"].unique())[-periodos.JANELA[freq]:]      # só os períodos mais recentes
+    sub = sub[sub["per"].isin(recentes)]
 
     def taxa(df, chaves):
         g = df.groupby(chaves)[cfg["flag"]].agg(prev="size", real="sum")
         return (g["real"] / g["prev"]).rename("taxa")
 
-    diaria = taxa(sub, [cfg["regiao_col"], "dia"]).unstack("dia")
-    diaria.loc["合计 Total"] = taxa(sub, ["dia"])
+    diaria = taxa(sub, [cfg["regiao_col"], "per"]).unstack("per")
+    diaria.loc["合计 Total"] = taxa(sub, ["per"])
     acumulado = pd.concat([taxa(sub, [cfg["regiao_col"]]), pd.Series({"合计 Total": sub[cfg["flag"]].mean()})])
 
     out = diaria.copy()
-    out.columns = [d.strftime("%d/%m") for d in out.columns]
+    curtos = [periodos.rotulo_curto(d, freq) for d in out.columns]
+    if len(set(curtos)) < len(curtos):                      # ex.: S41 de 2025 e de 2026 na mesma tabela
+        curtos = [periodos.rotulo_curto(d, freq, com_ano=True) for d in out.columns]
+    out.columns = curtos
     if out.shape[1] >= 2:
         out.insert(0, "环比 Variação±", out.iloc[:, -1] - out.iloc[:, -2])
     else:
@@ -157,3 +183,33 @@ def tendencia(base: pd.DataFrame, tipo: str, evento: str) -> pd.DataFrame:
     out = out.loc[ordem]
     out.index.name = cfg["regiao_rot"]
     return out.reset_index()
+
+
+def resumo(base: pd.DataFrame, tipo: str, evento: str, freq: str = "W", regional: str | None = None,
+           ini=None, fim=None) -> pd.DataFrame:
+    """Previsto, realizado e taxa por período (dia, semana ou mês) para uma regional (None = todas).
+    Períodos sem nenhuma viagem entram com taxa vazia (lacuna visível no gráfico)."""
+    cfg = INDICADORES[(tipo, evento)]
+    sub = base[base["tipo_linha"] == tipo]
+    if regional:
+        sub = sub[sub[cfg["regiao_col"]] == regional]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim))]
+    if sub.empty:
+        return pd.DataFrame(columns=["inicio", "periodo", "prev", "real", "taxa", "meta", "variacao"])
+    g = sub.groupby(periodos.inicio(sub["dia"], freq))[cfg["flag"]].agg(prev="size", real="sum")
+    g = g.reindex(periodos.completos(g.index.min(), g.index.max(), freq), fill_value=0)
+    g["taxa"] = (g["real"] / g["prev"]).where(g["prev"] > 0)
+    g["meta"] = METAS[evento]
+    g["variacao"] = g["taxa"].diff()                       # contra o período anterior (vazio se ele não teve dado)
+    anos = {d.year for d in g.index}
+    g["periodo"] = [periodos.rotulo_curto(d, freq, com_ano=len(anos) > 1) for d in g.index]
+    g.index.name = "inicio"
+    return g.reset_index()[["inicio", "periodo", "prev", "real", "taxa", "meta", "variacao"]]
+
+
+def regionais(base: pd.DataFrame, tipo: str, evento: str) -> list[str]:
+    """Regionais que existem nos dados para o indicador (fixas da config + novas, ex.: SR)."""
+    col = INDICADORES[(tipo, evento)]["regiao_col"]
+    sub = base[base["tipo_linha"] == tipo]
+    return [r for r in _regioes(sub, col) if (sub[col] == r).any()]

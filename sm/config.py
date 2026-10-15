@@ -17,6 +17,7 @@ COL_JMS = {
     "id": ["Tarefa de transporte No.", "Número do ID"],
     "status": ["Status"],
     "viagem": ["Nome da viagem"],
+    "rota": ["Nome da rota"],                      # coluna G do JMS: a rota correta; vazia nas Horas Extras
     "tipo_transportador": ["Tipo de transportador"],
     "transportador": ["Abreviatura de transportador"],
     "pedido_mae": ['Número de " Pedido mãe"', 'Número de "Pedido mãe"', "Número de Pedido mãe"],
@@ -28,7 +29,7 @@ COL_JMS = {
     "regiao_destino": ["Filial/Regional de destino"],
 }
 # opcionais: se não existirem no arquivo, ficam vazias
-COL_JMS_OPCIONAIS = {"transportador", "chegada", "placa", "regiao_destino"}
+COL_JMS_OPCIONAIS = {"transportador", "chegada", "placa", "regiao_destino", "rota"}
 
 # Anotação: remover do relatório do JMS
 COLUNAS_REMOVER = ["Km Google", "CHECK-IN"]
@@ -54,6 +55,12 @@ REGIOES = ["RJ", "SPS", "SPE", "MG", "PR", "SPN"]
 STATUS_VALIDOS = ("Concluído", "Em Trânsito")   # "Em viagem" e "Finalizado" no JMS
 TRANSPORTADOR_EXCLUIDO = "Franqueado"            # prefixo do valor, ex.: "Franqueado-加盟商"
 PEDIDO_MAE_MINIMO = 2                            # vazio, 0 e 1 são excluídos
+
+# SM previsto = nº de trechos da rota (cada hífen separa um trecho). Regra confirmada com o Renan (14/10):
+# usar a coluna G "Nome da rota" e a D "Nome da viagem" e ficar com a que tiver MAIS trechos
+# (G vazia, comum nas Horas Extras, vale a D; empate vale a G).
+# False = só a D, como na planilha antiga (usado pelo validar_sm.py para reproduzir a planilha finalizada).
+PREVISTO_PELA_ROTA = True
 
 # SM realizado nunca passa do previsto.
 # Na planilha, a fórmula da Coleta usa MIN(previsto; contagem) e a da Entrega não limita.

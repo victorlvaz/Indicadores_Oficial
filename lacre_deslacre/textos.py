@@ -39,25 +39,41 @@ def aba_excel_tabela(tipo: str, evento: str) -> str:
     return bi(TIPO_ZH[tipo] + EVENTO_ZH[evento], f"{TIPO_PT[tipo]} {EVENTO_PT[evento]}")
 
 
+def subtitulo_resumo(tipo: str, evento: str) -> str:
+    return bi(TIPO_ZH[tipo] + EVENTO_ZH[evento] + "汇总", f"Resumo – {TIPO_PT[tipo]} · {EVENTO_PT[evento]}")   # 汇总 [revisar]
+
+
+def aba_excel_resumo(tipo: str, evento: str) -> str:
+    return bi(TIPO_ZH[tipo] + EVENTO_ZH[evento] + "汇总", f"Res {TIPO_PT[tipo]} {EVENTO_PT[evento]}")
+
+
 def aba_excel_tendencia(tipo: str, evento: str) -> str:
     return bi(TIPO_ZH[tipo] + EVENTO_ZH[evento] + TENDENCIA_ZH, f"Tend {TIPO_PT[tipo]} {EVENTO_PT[evento]}")
 
 
+ABA_RESUMO = bi("汇总", "Resumo")                                                       # [revisar]
 ABA_BASE = bi("数据源 / 核对", "Base / Diagnóstico")                                     # 数据源 [planilha]; 核对 [revisar]
 
 # ---- barra lateral ----
 UPLOAD = bi("支线运输综合报表", "Relatório consolidado (.xls / .xlsx)")                   # [planilha]
 UPLOAD_AJUDA = frase("可上传一个或多个日期的报表；多天数据会填充趋势页。",                 # [revisar]
                      "Envie um ou mais dias. Com vários dias, a aba de tendência é preenchida.")
-REGRAS = bi("数据处理规则", "Regras aplicadas à base")                                    # [revisar]
-R_STATUS = bi("仅已完成 / 在途", "Só Concluído / Em Trânsito")                            # [planilha: 已完成, 在途]
-R_MESMO_SC = bi("剔除同场线路", "Excluir rotas do mesmo SC")                              # [planilha: 同场线路]
-R_COLETA = bi("集货：仅揽收网点", "Coleta: só pontos de coleta")                          # [planilha: 揽收网点]
-R_FRANQ = bi("剔除加盟商承运商", "Excluir transportador Franqueado")                      # [planilha: 加盟商]
-R_PEDIDO = bi("剔除主单数量为空、0 或 1", "Excluir pedido mãe vazio, 0 ou 1")             # [planilha: 主单数量]
 TODOS = bi("全部（累计）", "Todos (acumulado)")
 DIA = bi("日期（计划到达）", "Dia (chegada planejada)")                                    # [planilha: 计划到达]
-N_DIAS = bi("趋势：折线天数", "Tendência: nº de dias na linha")                           # [revisar]
+GRAN = bi("统计周期", "Período de análise")                                              # [revisar]
+GRAN_NOMES = {"D": bi("日", "Dia"), "W": bi("周", "Semana"), "M": bi("月", "Mês"), "Y": bi("年", "Ano")}   # [revisar]
+PERIODO = {"D": DIA, "W": bi("选择周（周一至周日）", "Semana (segunda a domingo)"),         # [revisar]
+           "M": bi("选择月份", "Mês"), "Y": bi("选择年份", "Ano")}
+COMPARAR = bi("对比", "Comparar com")                                                    # [revisar]
+COMP_ANTERIOR = bi("上一周期", "Período anterior")                                       # [revisar]
+COMP_ANO = bi("去年同期", "Mesmo período do ano passado")                                # [revisar]
+COL_COMP = bi("对比期", "Taxa comp.")                                           # [revisar]
+COL_VAR = bi("变化", "Var. p.p.")                                         # [revisar]
+COMP_LEGENDA = bi("对比", "Comparando com")                                              # [revisar]
+COMP_SEM_TODOS = frase("选择“全部”时不进行对比。", "Com “Todos” não há comparação; escolha um período.")   # [revisar]
+COMP_SEM_DADOS = frase("对比期没有数据。", "Não há dados no período comparado.")           # [revisar]
+UNIDADE_TENDENCIA = {"D": ("天", "dias"), "W": ("周", "semanas"), "M": ("个月", "meses"), "Y": ("年", "anos")}  # [revisar]
+N_DIAS = bi("趋势：折线周期数", "Tendência: nº de períodos na linha")                      # [revisar]
 ESCALA = bi("趋势：统一刻度", "Tendência: mesma escala em todas as linhas")               # [revisar]
 ESCALA_AJUDA = frase("关闭：每条线使用各自刻度（同 Excel 迷你图）。开启：便于比较各区域的走势。",   # [revisar]
                      "Desligado: cada linha usa a própria escala (como o mini-gráfico do Excel). "
@@ -89,23 +105,31 @@ def nota_texto(evento: str) -> str:
 EXPORTAR = bi("导出 Excel (.xlsx)", "Exportar tudo para Excel")                          # [revisar]
 
 
-def arquivo_excel(dia) -> str:
-    sufixo = "Todos" if dia is None else dia.strftime("%d.%m")
+def arquivo_excel(sufixo: str) -> str:
     return f"支线解封车率_Lacre_Deslacre_{sufixo}.xlsx"
 
 
 # ---- mensagens ----
-INFO_SEM_ARQUIVO = frase("请在左侧边栏上传支线运输综合报表。",                             # [revisar]
-                         "Envie o relatório consolidado da linha secundária na barra lateral.")
-AVISO_BASE_VAZIA = frase("应用规则后没有剩余数据。",                                      # [revisar]
-                         "Nenhuma linha restou após as regras aplicadas.")
-INFO_UM_DIA = frase("数据中只有一天，请上传更多天数以查看趋势。",                           # [revisar]
-                    "Só há um dia na base. Envie mais dias para ver a tendência.")
+INFO_SEM_ARQUIVO = frase("历史数据库为空：请在左侧边栏上传报表并点击“保存到历史”。",             # [revisar]
+                         "O histórico está vazio: envie o relatório na barra lateral e clique em “Salvar no histórico”.")
+HIST = bi("历史数据库", "Histórico (banco de dados)")                                    # [revisar]
+SALVAR = bi("保存到历史", "Salvar no histórico")                                          # [revisar]
+SALVAR_AJUDA = frase("把已上传的报表处理后存入数据库；同一天重复上传只会更新，不会重复。",          # [revisar]
+                     "Aplica as regras e grava no banco. Reenviar o mesmo dia só atualiza, não duplica.")
+PENDENTE = frase("以下文件尚未保存：", "Arquivos ainda não salvos no histórico:")           # [revisar]
+SALVO_OK = bi("已保存", "Salvo")                                                          # [revisar]
+ERRO_BANCO = frase("无法连接数据库：", "Não foi possível acessar o banco de dados: ")        # [revisar]
+SUB_CARGAS = bi("上传记录", "Histórico de cargas")                                        # [revisar]
+BANCO_EM_USO = bi("数据库", "Banco em uso")                                              # [revisar]
+INFO_SQLITE = frase("当前使用本地 SQLite 文件；连接公司数据库只需填写连接地址（见 README）。",     # [revisar]
+                    "Usando arquivo SQLite local. Para o banco da empresa, basta informar a URL (veja o README).")
+AVISO_BASE_VAZIA = frase("该周期没有数据。", "Não há dados neste período.")                  # [revisar]
+INFO_UM_DIA = frase("数据中只有一个周期，需要更多数据才能显示趋势。",                         # [revisar]
+                    "Só há um período na base. Com mais dados a tendência aparece.")
 ERRO_COLUNAS = "缺少列 Colunas não encontradas no arquivo: "                              # [revisar]
-EXPANDER_TENDENCIA = bi("每日完整表（含环比与累计）", "Tabela completa por dia (com variação e acumulado)")  # 环比/累计 [planilha]
+EXPANDER_TENDENCIA = bi("完整表（含环比与累计）", "Tabela completa (com variação e acumulado)")  # 环比/累计 [planilha]
 
 # ---- aba Base / Diagnóstico ----
-SUB_DIAG = bi("按规则剔除的行数", "Linhas removidas por regra")                           # [revisar]
 SUB_BASE = bi("处理后数据", "Base tratada")                                               # [revisar]
 
 DIAG = {
@@ -139,3 +163,20 @@ COLUNAS_BASE = {
     "lacrado": bi("已封车", "Lacrado"),                                                   # [revisar]
     "deslacrado": bi("已解车", "Deslacrado"),                                             # [revisar]
 }
+
+
+# ---- aba Resumo ----
+RES_REGIONAL = bi("区域", "Regional")                                                    # [revisar]
+RES_TODAS = bi("全部区域", "Todas")                                                      # [revisar]
+RES_VISAO = bi("查看方式", "Visão")                                                      # [revisar]
+RES_ANO = bi("年份", "Ano")                                                              # [revisar]
+RES_TODO_HISTORICO = bi("全部历史", "Todo o histórico")                                  # [revisar]
+RES_NOTA = frase("本页筛选独立于左侧边栏的周期。", "Os filtros desta aba são independentes do período da barra lateral.")   # [revisar]
+RES_PERIODO = bi("周期", "Período")                                                      # [revisar]
+RES_ULTIMO = bi("最近周期", "Último período")                                            # [revisar]
+RES_VS_META = bi("对比目标", "vs meta")                                                  # [revisar]
+RES_TABELA = bi("数据表", "Tabela de apoio")                                             # [revisar]
+RES_SEM_DADOS = frase("所选筛选条件下没有数据。", "Sem dados para o filtro escolhido.")   # [revisar]
+RES_GRAF_TAXA = bi("比率", "Taxa")                                                       # [revisar]
+RES_GRAF_VOL = bi("数量", "Volume")                                                      # [revisar]
+RES_LACUNA = frase("空白处表示该周期没有上传数据。", "Pontos vazios = período sem dados no histórico.")   # [revisar]

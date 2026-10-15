@@ -1,0 +1,11 @@
+# Tema do app (cabeçalho das tabelas em vermelho, igual às células abaixo da meta): o vermelho #E60000 é a única cor de destaque (abas, caixas de seleção, controle deslizante).
+# Definido nos dois temas para o app continuar acompanhando o modo claro/escuro do sistema.
+[theme.light]
+primaryColor = "#E60000"
+dataframeHeaderBackgroundColor = "#E60000"
+dataframeHeaderTextColor = "#FFFFFF"
+
+[theme.dark]
+primaryColor = "#E60000"
+dataframeHeaderBackgroundColor = "#E60000"
+dataframeHeaderTextColor = "#FFFFFF"

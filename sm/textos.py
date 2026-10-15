@@ -14,8 +14,7 @@ TIPO_ZH = {"COLETA": "集货", "ENTREGA": "散货"}                             
 TIPO_PT = {"COLETA": "Coleta", "ENTREGA": "Entrega"}
 
 
-def titulo_tabela(tipo: str, dia) -> str:
-    quando = TODOS if dia is None else dia.strftime("%d/%m")
+def titulo_tabela(tipo: str, quando: str) -> str:
     return f"SM状态统计 - {TIPO_ZH[tipo]} / Estatística de Status dos SMs - {TIPO_PT[tipo]} – {quando}"
 
 
@@ -59,27 +58,15 @@ UP_HIST = bi("历史数据", "Histórico (Excel já exportado pelo app)")       
 UP_AJUDA_HIST = frase("上传之前导出的 Excel，与今天的数据合并，形成每日历史。",               # [revisar]
                       "Envie o Excel exportado nos dias anteriores: ele é somado aos arquivos de hoje e "
                       "forma o histórico por dia (tendência). Exporte de novo no fim para levar o histórico adiante.")
-REGRAS = bi("数据处理规则", "Regras aplicadas à base")                                     # [revisar]
-R_STATUS = bi("仅已完成 / 在途", "Só Concluído / Em Trânsito")                             # [planilha]
-R_MESMO_SC = bi("剔除同场线路", "Excluir rotas do mesmo SC")                               # [planilha]
-R_COLETA = bi("集货：仅揽收业务网点", "Coleta: só unidades com coleta")                    # [planilha]
-R_FRANQ = bi("剔除加盟商", "Excluir fornecedor Franqueado")                                # [planilha]
-R_PEDIDO = bi("剔除主单数量为0和1", "Excluir pedido mãe vazio, 0 ou 1")                     # [planilha]
-R_TECHIS_STATUS = bi("TECHIS：仅在途 / 已完成", "TECHIS: só Em Viagem / Finalizado")         # [revisar]
-R_LIMITE = bi("实监控次数不超过应监控次数", "SM realizado limitado ao previsto")            # [revisar]
-R_LIMITE_AJUDA = frase("表格原公式：集货有上限 (MIN)，散货没有。",                          # [revisar]
-                       "Na planilha a Coleta usa MIN(previsto; contagem) e a Entrega não. "
-                       "Ligado: aplica o limite nas duas.")
 TODOS = bi("全部（累计）", "Todos (acumulado)")
 DIA = bi("日期（计划出发）", "Dia (saída planejada)")                                       # [planilha: 规划离开日期]
-N_DIAS = bi("趋势：折线天数", "Tendência: nº de dias na linha")                            # [revisar]
+N_DIAS = bi("趋势：折线周期数", "Tendência: nº de períodos na linha")                       # [revisar]
 ESCALA = bi("趋势：统一刻度", "Tendência: mesma escala em todas as linhas")                # [revisar]
 EXPORTAR = bi("导出 Excel (.xlsx)", "Exportar tudo para Excel")                           # [revisar]
 EXPORTAR_TECHIS = bi("包含 TECHIS 数据", "Incluir aba SISTEMA TECHIS no Excel")            # [revisar]
 
 
-def arquivo_excel(dia) -> str:
-    sufixo = "Todos" if dia is None else dia.strftime("%d.%m")
+def arquivo_excel(sufixo: str) -> str:
     return f"Estatística de Status dos SMs SM状态统计 {sufixo}.xlsx"
 
 
@@ -98,26 +85,32 @@ OBS = frase("备注：每个任务单实际SM次数/应SM次数。数据源：JM
             "Secundárias. Período: horário planejado de saída das 00:00 às 23:59:59.")
 
 # ---- mensagens ----
-INFO_SEM_ARQUIVO = frase("请在左侧上传 JMS 集货、散货报表和 TECHIS 导出文件。",              # [revisar]
-                         "Envie na barra lateral os relatórios do JMS (Coleta e Entrega) e a extração do TECHIS.")
+INFO_SEM_ARQUIVO = frase("历史数据库为空：请在左侧上传 JMS 集货、散货报表和 TECHIS 导出文件，然后点击“保存到历史”。",   # [revisar]
+                         "O histórico está vazio: envie os relatórios do JMS (Coleta e Entrega) e a extração do "
+                         "TECHIS na barra lateral e clique em “Salvar no histórico”.")
+SALVAR_SEM_TECHIS = frase("保存前需要上传 TECHIS 导出文件（否则实际监控次数为 0）。",              # [revisar]
+                          "Para salvar, envie também a extração do TECHIS (sem ela os SMs realizados ficariam em 0).")
+SALVAR_SEM_JMS = frase("请先上传 JMS 报表。", "Envie antes ao menos um relatório do JMS.")      # [revisar]
+PENDENTES_AVISO = frase("以下数据尚未保存到历史，已计入当前统计。",                              # [revisar]
+                        "Os dados enviados ainda não foram salvos no histórico, mas já entram nas tabelas abaixo.")
 INFO_SEM_TECHIS = frase("未上传 TECHIS：实际监控次数会全部为 0。",                           # [revisar]
                         "Sem o arquivo do TECHIS os SMs realizados ficam todos em 0. Envie a extração na barra lateral.")
 INFO_SEM_TIPO = frase("未上传该类型的 JMS 报表。",                                          # [revisar]
                       "O relatório do JMS deste tipo não foi enviado.")
 INFO_SEM_TECHIS_ABA = frase("请在左侧上传 TECHIS 导出文件。",                                # [revisar]
                             "Envie a extração do TECHIS na barra lateral para ver esta aba.")
-INFO_UM_DIA = frase("数据中只有一天，请上传更多天数以查看趋势。",                             # [revisar]
-                    "Só há um dia na base. Envie mais dias para ver a tendência.")
-AVISO_BASE_VAZIA = frase("应用规则后没有剩余数据。", "Nenhuma linha restou após as regras aplicadas.")  # [revisar]
+INFO_UM_DIA = frase("数据中只有一个周期，需要更多数据才能显示趋势。",                         # [revisar]
+                    "Só há um período na base. Com mais dados a tendência aparece.")
+AVISO_BASE_VAZIA = frase("该周期没有数据。", "Não há dados neste período.")  # [revisar]
 ERRO_COLUNAS = "缺少列 Colunas não encontradas no arquivo: "                               # [revisar]
 ERRO_TECHIS = "TECHIS: 找不到列 Coluna não encontrada: "                                   # [revisar]
-EXPANDER_TENDENCIA = bi("每日完整表（含环比与累计）", "Tabela completa por dia (com variação e acumulado)")
+EXPANDER_TENDENCIA = bi("完整表（含环比与累计）", "Tabela completa (com variação e acumulado)")
 ACUMULADO_AJUDA = frase("累计 = 每日占比的平均值（同表格）。",                               # [revisar]
-                        "Acumulado = média das taxas diárias do período (igual à planilha).")
+                        "Acumulado = média das taxas de cada período (igual à planilha).")
 
 # ---- aba Viagens sem SM ----
 PEND_INTRO = frase("所选日期中实际监控次数少于应监控次数的任务单。",                         # [revisar]
-                   "Viagens do dia escolhido com menos SMs realizados do que o previsto.")
+                   "Viagens do período escolhido com menos SMs realizados do que o previsto.")
 PEND_TIPO = bi("类型", "Tipo")                                                            # [revisar]
 PEND_REGIOES = bi("代理区", "Regionais")                                                  # [planilha: 代理区]
 def pend_resumo(viagens: int, sms: int) -> str:                                         # [revisar]
@@ -156,6 +149,7 @@ DIAG = {
     "franqueado": bi("剔除：加盟商", "Removidas: fornecedor Franqueado"),
     "pedido_mae": bi("剔除：主单数量为空、0 或 1", "Removidas: pedido mãe vazio, 0 ou 1"),
     "usadas": bi("使用行数", "Linhas usadas"),
+    "rota_vazia": bi("线路名称为空，改用任务名称", "Info: Nome da rota (G) vazio, usou Nome da viagem (D)"),   # [revisar]
     "techis_linhas": bi("TECHIS 行数", "Linhas TECHIS"),
     "techis_status": bi("TECHIS 剔除：状态非在途/已完成", "TECHIS removidas: status fora de Em Viagem/Finalizado"),  # [revisar]
     "techis_tab": bi("任务单号含空格/TAB", "Nº Embarque com espaço/TAB"),                      # [revisar]
@@ -166,6 +160,8 @@ COLUNAS_BASE = {                                                                
     "id": bi("任务单号", "Tarefa de transporte No."),
     "status": bi("状态", "Status"),
     "viagem": bi("任务名称", "Nome da viagem"),
+    "rota": bi("线路名称", "Nome da rota"),
+    "rota_usada": bi("预计次数所用线路", "Rota usada no previsto"),                               # [revisar]
     "tipo_transportador": bi("承运商类型", "Tipo de transportador"),
     "transportador": bi("承运商简称", "Transportador"),
     "pedido_mae": bi("主单数量", "Pedido mãe"),
@@ -181,3 +177,22 @@ COLUNAS_BASE = {                                                                
     "sm_contagem": bi("TECHIS 次数", "SMs no TECHIS"),
     "sm_real": bi("实监控次数", "SM realizado"),
 }
+
+
+# ---- período, comparação, histórico e resumo (compartilhados com o Lacre/Deslacre) ----
+from lacre_deslacre.textos import (BANCO_EM_USO, COL_COMP, COL_VAR, COMP_ANO, COMP_ANTERIOR, COMP_LEGENDA,  # noqa: E402,F401
+                                   COMP_SEM_DADOS, COMP_SEM_TODOS, COMPARAR, ERRO_BANCO, GRAN, GRAN_NOMES, HIST,
+                                   PENDENTE, PERIODO, RES_ANO, RES_GRAF_TAXA, RES_GRAF_VOL, RES_LACUNA, RES_NOTA,
+                                   RES_PERIODO, RES_REGIONAL, RES_SEM_DADOS, RES_TABELA, RES_TODAS,
+                                   RES_TODO_HISTORICO, RES_ULTIMO, RES_VISAO, SALVAR, SALVAR_AJUDA, SALVO_OK,
+                                   SUB_CARGAS, UNIDADE_TENDENCIA)
+
+ABA_RESUMO = bi("汇总", "Resumo")                                                          # [revisar]
+
+
+def subtitulo_resumo(tipo: str) -> str:
+    return bi(f"{TIPO_ZH[tipo]}汇总", f"Resumo – {TIPO_PT[tipo]}")                          # 汇总 [revisar]
+
+
+def aba_excel_resumo(tipo: str) -> str:
+    return bi(f"{TIPO_ZH[tipo]}汇总", f"Res {TIPO_PT[tipo]}")
