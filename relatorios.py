@@ -39,4 +39,14 @@ RELATORIOS = [
                            "Taxa de uso do APP pelo motorista (check-out e check-in) por regional (Coleta e Entrega), "
                            "ranking, meta, tendência e resumo."),
     },
+    {
+        "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("装载率", "Taxa de Ocupação"),
+        "arquivo": "paginas/ocupacao_tela.py",
+        "url": "ocupacao",
+        "icone": ":material/local_shipping:",
+        "descricao": frase("按区域和车型统计车辆装载率（集货与散货），含趋势与汇总。",
+                           "Ocupação dos veículos por regional e tipo de veículo (Coleta e Entrega), "
+                           "tendência e resumo."),
+    },
 ]

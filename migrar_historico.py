@@ -16,10 +16,12 @@ import pandas as pd
 from sqlalchemy import create_engine, delete, func, inspect, select
 
 from lacre_deslacre import historico as lac
+from app_uso import historico as app
+from ocupacao import historico as oc
 from sm import historico as sm
 
 RAIZ = Path(__file__).resolve().parent
-TABELAS = [lac.viagens, lac.cargas, sm.viagens, sm.cargas]
+TABELAS = [lac.viagens, lac.cargas, sm.viagens, sm.cargas, app.viagens, app.cargas, app.transportadores, oc.viagens, oc.cargas]
 LOTE = 5000
 
 
@@ -35,6 +37,8 @@ def main() -> int:
     org, dst = create_engine(a.origem), create_engine(a.destino)
     lac.meta.create_all(dst)
     sm.meta.create_all(dst)
+    app.meta.create_all(dst)
+    oc.meta.create_all(dst)
     existentes = set(inspect(org).get_table_names())
     for t in TABELAS:
         if t.name not in existentes:
