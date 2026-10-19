@@ -11,6 +11,7 @@ from comum.estilos import estilizar_tendencia, pct, pp
 from comum.idioma import cabecalho, rodape
 from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
 from comum.sparkline import tabela_tendencia_html
+from comum import janela as janela_ui
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from sm import historico, resumo_ui, textos as tx
 from sm.calculos import (aplicar_techis, base_para_exportar, carregar_apoio, colunas_internas, comparar,
@@ -118,11 +119,12 @@ up_techis = upload_persistente("sm_techis", tx.UP_TECHIS, ["xls", "xlsx", "csv"]
 pendente = bool(up["COLETA"] or up["ENTREGA"] or up_techis)
 
 # TECHIS (regras fixas: só Em Viagem / Finalizado)
-try:
-    techis_partes = [_ler_techis(a.getvalue(), a.name) for a in up_techis or []]
-except ValueError as erro:
-    st.sidebar.error(str(erro))
-    st.stop()
+techis_partes = []
+for a in up_techis or []:
+    try:
+        techis_partes.append(_ler_techis(a.getvalue(), a.name))
+    except Exception as erro:                       # arquivo ilegível/errado: avisa e segue (não derruba a página)
+        st.sidebar.error(f"TECHIS · {a.name}: {erro}")
 techis = (pd.concat(techis_partes, ignore_index=True).drop_duplicates() if techis_partes else None)
 techis_removidas = 0
 if techis is not None:
@@ -131,15 +133,15 @@ if techis is not None:
 # JMS enviado e ainda não salvo (as regras do tratamento são fixas, ver sm/config.py)
 apoio = carregar_apoio()
 novas, diags = [], []
-try:
-    for tipo in TIPOS:
-        for arq in up[tipo] or []:
+for tipo in TIPOS:
+    for arq in up[tipo] or []:
+        try:
             b, d = preparar_jms(_ler_jms(arq.getvalue(), arq.name), tipo, apoio)
-            novas.append(b)
-            diags.append({tx.DIAG["arquivo"]: arq.name, **d})
-except ValueError as erro:
-    st.sidebar.error(str(erro))
-    st.stop()
+        except Exception as erro:                   # arquivo ilegível/errado: avisa e segue com os demais
+            st.sidebar.error(f"{tx.TIPO_PT[tipo]} · {arq.name}: {erro}")
+            continue
+        novas.append(b)
+        diags.append({tx.DIAG["arquivo"]: arq.name, **d})
 
 if pendente:
     st.sidebar.caption(tx.PENDENTE + " " + ", ".join(a.name for g in (*up.values(), up_techis) for a in g or []))
@@ -252,6 +254,7 @@ for aba, tipo in zip(abas[:2], TIPOS):
         export[tx.aba_excel_tabela(tipo)] = (exp, cols_exp, tx.OBS.replace("  \n", "\n"))
 
 with abas[2]:
+    n_tab = janela_ui.escolher(gran, "sm_janela")
     for tipo in TIPOS:
         t = tendencia(base, tipo, gran, fim)
         if t.empty:
@@ -260,13 +263,15 @@ with abas[2]:
         if t.shape[1] > 4:
             st.html(tabela_tendencia_html(t, n_dias=n_per, escala_comum=escala_comum,
                                           unidade=tx.UNIDADE_TENDENCIA[gran]))
+            t_tab = tendencia(base, tipo, gran, fim, janela=n_tab)
             with st.expander(tx.EXPANDER_TENDENCIA):
-                st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
+                st.dataframe(estilizar_tendencia(t_tab), width="stretch", hide_index=True)
                 st.caption(tx.ACUMULADO_AJUDA)
         else:
             st.info(tx.INFO_UM_DIA)
+            t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(tipo)] = (t, {})
+        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {})
 
 with abas[3]:
     if base.empty:

@@ -8,6 +8,7 @@ from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
+from comum import janela as janela_ui
 from comum.uploads import manter, opcao_valida
 from lacre_deslacre import historico, periodos, resumo_ui, textos as tx
 from lacre_deslacre.calculos import comparar, rotular_tabela, tabela_periodo, tendencia
@@ -118,6 +119,7 @@ for aba, (tipo, evento) in zip(abas[:4], INDICADORES):
 
 for aba, evento in zip(abas[4:6], ["lacre", "deslacre"]):
     with aba:
+        n_tab = janela_ui.escolher(gran, f"lac_janela_{evento}")
         for tipo in ("COLETA", "ENTREGA"):
             t = tendencia(base, tipo, evento, gran, fim)
             if t.empty:
@@ -126,12 +128,14 @@ for aba, evento in zip(abas[4:6], ["lacre", "deslacre"]):
             if t.shape[1] > 4:
                 st.html(tabela_tendencia_html(t, n_dias=n_per, escala_comum=escala_comum,
                                               unidade=tx.UNIDADE_TENDENCIA[gran]))
+                t_tab = tendencia(base, tipo, evento, gran, fim, janela=n_tab)
                 with st.expander(tx.EXPANDER_TENDENCIA):
-                    st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
+                    st.dataframe(estilizar_tendencia(t_tab), width="stretch", hide_index=True)
             else:
                 st.info(tx.INFO_UM_DIA)
+                t_tab = t
                 st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-            export[tx.aba_excel_tendencia(tipo, evento)] = (t, {})
+            export[tx.aba_excel_tendencia(tipo, evento)] = (t_tab, {})
 
 with abas[6]:
     resumo_ui.mostrar(base, export)

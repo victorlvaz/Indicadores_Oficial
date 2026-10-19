@@ -191,14 +191,14 @@ def rotular_tabela(tab: pd.DataFrame) -> pd.DataFrame:
                                "taxa_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
 
 
-def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataFrame:
+def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None, janela: int | None = None) -> pd.DataFrame:
     sub = base[base["tipo_linha"] == tipo]
     if ate is not None:
         sub = sub[sub["dia"] <= pd.Timestamp(ate)]
     if sub.empty:
         return pd.DataFrame()
     sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
-    recentes = sorted(sub["per"].unique())[-periodos.JANELA[freq]:]
+    recentes = sorted(sub["per"].unique())[-(janela or periodos.JANELA[freq]):]
     sub = sub[sub["per"].isin(recentes)]
 
     def taxa(chaves):

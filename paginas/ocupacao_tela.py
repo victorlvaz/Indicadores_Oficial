@@ -9,6 +9,7 @@ from comum.estilos import estilizar_tendencia, pct, pp
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
+from comum import janela as janela_ui
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
 from ocupacao import historico, resumo_ui, textos as tx
@@ -162,6 +163,7 @@ for aba, tipo in zip(abas[:2], TIPOS):
         rodape(*tx.NOTAS[tipo])
 
 with abas[2]:
+    n_tab = janela_ui.escolher(gran, "oc_janela")
     for tipo in TIPOS:
         t = tendencia(base, tipo, gran, fim)
         if t.empty:
@@ -169,12 +171,14 @@ with abas[2]:
         st.subheader(tx.subtitulo_tendencia(tipo))
         if t.shape[1] > 4:
             st.html(tabela_tendencia_html(t, n_dias=n_per, escala_comum=escala_comum, unidade=tx.UNIDADE_TENDENCIA[gran]))
+            t_tab = tendencia(base, tipo, gran, fim, janela=n_tab)
             with st.expander(tx.EXPANDER_TENDENCIA):
-                st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
+                st.dataframe(estilizar_tendencia(t_tab), width="stretch", hide_index=True)
         else:
             st.info(tx.INFO_UM_DIA)
+            t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(tipo)] = (t, {})
+        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {})
 
 with abas[3]:
     resumo_ui.mostrar(base, export)

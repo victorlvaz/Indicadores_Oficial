@@ -303,7 +303,7 @@ def rotular_tabela(tab: pd.DataFrame) -> pd.DataFrame:
                                "taxa_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
 
 
-def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataFrame:
+def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None, janela: int | None = None) -> pd.DataFrame:
     """Aba Tendência: % por período (dia, semana, mês ou ano) e regional + acumulado (média das taxas dos períodos,
     como na planilha) + variação do último período vs. o anterior. `ate` = último dia considerado."""
     sub = base[base["tipo"] == tipo]
@@ -313,7 +313,7 @@ def tendencia(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.Da
     if sub.empty:
         return pd.DataFrame()
     sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
-    sub = sub[sub["per"].isin(sorted(sub["per"].unique())[-periodos.JANELA[freq]:])]
+    sub = sub[sub["per"].isin(sorted(sub["per"].unique())[-(janela or periodos.JANELA[freq]):])]
     g = sub.groupby(["regiao", "per"])[["sm_prev", "sm_real"]].sum()
     diaria = (g["sm_real"] / g["sm_prev"]).unstack("per")
     t = sub.groupby("per")[["sm_prev", "sm_real"]].sum()

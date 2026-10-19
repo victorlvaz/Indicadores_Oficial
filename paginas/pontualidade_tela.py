@@ -8,6 +8,7 @@ from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
+from comum import janela as janela_ui
 from comum.uploads import manter, opcao_valida
 from pontualidade import historico, resumo_ui, textos as tx
 from pontualidade.calculos import comparar, rotular_tabela, tabela_periodo, tendencia, visao
@@ -126,6 +127,7 @@ for aba, tipo in zip(abas[:2], tipos):
         export[tx.aba_excel_tabela(ind, tipo)] = (exp, cols_exp, tx.nota_texto(ind, tipo))
 
 with abas[2]:
+    n_tab = janela_ui.escolher(gran, "pt_janela")
     for tipo in tipos:
         t = tendencia(vis[tipo], tipo, gran, fim)
         if t.empty:
@@ -133,12 +135,14 @@ with abas[2]:
         st.subheader(tx.subtitulo_tendencia(ind, tipo))
         if t.shape[1] > 4:
             st.html(tabela_tendencia_html(t, n_dias=n_per, escala_comum=escala_comum, unidade=tx.UNIDADE_TENDENCIA[gran]))
+            t_tab = tendencia(vis[tipo], tipo, gran, fim, janela=n_tab)
             with st.expander(tx.EXPANDER_TENDENCIA):
-                st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
+                st.dataframe(estilizar_tendencia(t_tab), width="stretch", hide_index=True)
         else:
             st.info(tx.INFO_UM_DIA)
+            t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(ind, tipo)] = (t, {})
+        export[tx.aba_excel_tendencia(ind, tipo)] = (t_tab, {})
 
 with abas[3]:
     resumo_ui.mostrar(base, ind, export)

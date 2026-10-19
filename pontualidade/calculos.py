@@ -148,7 +148,7 @@ def rotular_tabela(tab: pd.DataFrame, ind: str, tipo: str) -> pd.DataFrame:
         "taxa_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
 
 
-def tendencia(v: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataFrame:
+def tendencia(v: pd.DataFrame, tipo: str, freq: str = "D", ate=None, janela: int | None = None) -> pd.DataFrame:
     """Taxa por período e região + acumulado da janela + variação do último contra o anterior."""
     sub = v
     if ate is not None:
@@ -156,7 +156,7 @@ def tendencia(v: pd.DataFrame, tipo: str, freq: str = "D", ate=None) -> pd.DataF
     if sub.empty:
         return pd.DataFrame()
     sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
-    recentes = sorted(sub["per"].unique())[-periodos.JANELA[freq]:]
+    recentes = sorted(sub["per"].unique())[-(janela or periodos.JANELA[freq]):]
     sub = sub[sub["per"].isin(recentes)]
 
     g = sub.groupby(["regiao", "per"])[["n_prev", "n_real"]].sum()

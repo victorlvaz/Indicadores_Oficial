@@ -296,13 +296,13 @@ def comparar(atual: pd.DataFrame, comparada: pd.DataFrame, chave=("regiao",)) ->
     return out
 
 
-def tendencia(base: pd.DataFrame, metrica: str = "frete_pacote", freq: str = "D", ate=None) -> pd.DataFrame:
+def tendencia(base: pd.DataFrame, metrica: str = "frete_pacote", freq: str = "D", ate=None, janela: int | None = None) -> pd.DataFrame:
     """Regional × períodos (últimos da janela) para o indicador escolhido (frete_pacote ou frete_km), com Total no topo."""
     sub = base if ate is None else base[base["dia"] <= pd.Timestamp(ate)]
     if sub.empty:
         return pd.DataFrame()
     sub = sub.assign(per=periodos.inicio(sub["dia"], freq))
-    recentes = sorted(sub["per"].unique())[-periodos.JANELA[freq]:]
+    recentes = sorted(sub["per"].unique())[-(janela or periodos.JANELA[freq]):]
     sub = sub[sub["per"].isin(recentes)]
     den = "pacotes_n" if metrica == "frete_pacote" else "km_n"
 

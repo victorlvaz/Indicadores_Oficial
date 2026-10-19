@@ -7,6 +7,7 @@ from comum.estilos import estilizar_tendencia  # noqa: F401
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
+from comum import janela as janela_ui
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import manter, opcao_valida, remover, upload_persistente
 from custos import historico, resumo_ui, textos as tx
@@ -199,6 +200,7 @@ for aba, dim, sub, nome in ((abas[1], "veiculo", tx.SUB_VEICULO, "veiculo"), (ab
 # --- tendência ---
 with abas[3]:
     metrica = st.radio(tx.METRICA, list(tx.METRICAS), horizontal=True, key="cu_metrica", format_func=lambda m: tx.METRICAS[m])
+    n_tab = janela_ui.escolher(gran, "cu_janela")
     t = tendencia(base, metrica, gran, fim)
     if not t.empty:
         st.subheader(tx.SUB_TEND[metrica])
@@ -208,12 +210,13 @@ with abas[3]:
                                                    "Y": ("年", "anos")}[gran]))
         else:
             st.info(tx.INFO_UM_DIA)
+        t_tab = tendencia(base, metrica, gran, fim, janela=n_tab) if t.shape[1] > 4 else t
         with st.expander(tx.RES_TABELA):
-            vis = t.copy()
+            vis = t_tab.copy()
             for c in vis.columns[1:]:
                 vis[c] = vis[c].map(variacao if c == tx.COL_VAR_TEND else brl)
             st.dataframe(vis, width="stretch", hide_index=True)
-        exp = t.copy()
+        exp = t_tab.copy()
         exp[tx.COL_VAR_TEND] = exp[tx.COL_VAR_TEND] * 100
         export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND]})
 
