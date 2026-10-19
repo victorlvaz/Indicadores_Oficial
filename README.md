@@ -85,6 +85,20 @@ do mesmo SC, sem Franqueados; a Coleta ignora pedido mãe vazio/0/1 e a Entrega 
 planilha do Lucas. Tipo de veículo sem capacidade (ex.: BARCO) aparece em aviso na aba Base. Tabelas `oc_viagens`, `oc_cargas`.
 Validar: `python validar_ocupacao.py "relatorio_bruto.xls" "OCUPAÇÃO_SECUNDÁRIA.xlsx" 2026-10-14`.
 
+## Pontualidade (支线准点率): Taxa de Chegada e Taxa de Saída
+Uma tela com seletor **Chegada / Saída**, alimentada pelo mesmo arquivo: o *Relatório consolidado da linha secundária*
+(Coleta e Entrega juntas). Cada linha é um **trecho** da viagem. Regras (conferidas contra `Taxa_de_Chegada` e `Taxa_de_Saída`):
+- **Pontual:** chegada real ≤ chegada planejada (Chegada) ou saída real ≤ saída planejada (Saída). Sem horário real = atraso,
+  exceto se o horário planejado ainda não venceu na hora da extração (esses trechos ficam fora do cálculo e voltam quando
+  o arquivo seguinte trouxer o horário real).
+- **Dia da operação:** horário planejado − 8 h (o dia começa às 08:00). Chegada usa a chegada planejada; Saída, a saída planejada.
+  O primeiro e o último dia do arquivo vêm incompletos; o app abre no último período com volume normal.
+- **Regional:** Coleta pela regional de **saída**, Entrega pela de **chegada** (nas duas taxas). Só Concluído e Em Trânsito.
+- **Total:** a linha de total das tabelas é a **média das taxas das regionais** (igual à planilha); o card do Resumo é ponderado pelos trechos.
+- Reenviar o mesmo arquivo atualiza os trechos (chave id + estações + saída planejada), inclusive os horários reais que faltavam.
+  Tabelas `pt_trechos`, `pt_cargas`. Validar: `python validar_pontualidade.py "consolidado.xls" "Taxa_de_Chegada.xlsx" "Taxa_de_Saida.xlsx" 2026-10-14`
+  (pequenas diferenças são esperadas: a planilha foi gerada antes de alguns horários reais serem preenchidos).
+
 ## Período e comparação
 - **Período de análise:** Dia, Semana (segunda a domingo), Mês ou Ano, mais a opção *Todos (acumulado)*.
 - **Comparar com:** *Período anterior* (dia anterior, semana anterior, mês anterior, ano anterior) ou
@@ -104,6 +118,7 @@ paginas/
   app_uso_tela.py            tela da Taxa de Uso de APP
   ocupacao_tela.py           tela da Taxa de Ocupação
   custos_tela.py             tela dos Custos
+  pontualidade_tela.py       tela da Pontualidade (Chegada e Saída)
 lacre_deslacre/              regras e cálculos do Lacre/Deslacre
   config.py  calculos.py  textos.py  apoio/*.csv
   historico.py  gravar/ler o histórico no banco     resumo_ui.py  aba Resumo
@@ -111,6 +126,7 @@ sm/                          regras e cálculos do SM (config, calculos, textos,
 app_uso/                     regras e cálculos da Taxa de Uso de APP (config, calculos, textos, historico, resumo_ui)
 ocupacao/                    regras e cálculos da Taxa de Ocupação (idem)
 custos/                      regras e cálculos dos Custos (idem)
+pontualidade/                regras e cálculos da Pontualidade (idem)
 comum/                       partes reaproveitadas por todos os relatórios
   banco.py      conexão com o banco (SQLite por padrão, URL da empresa por configuração)
   periodos.py   dia/semana/mês/ano e comparação      graficos.py  gráficos vermelho/cinza
@@ -119,7 +135,7 @@ comum/                       partes reaproveitadas por todos os relatórios
   estilos.py    cor de meta nas tabelas      exportar.py   Excel
   sparkline.py  tabela de tendência com mini-gráficos de linha e pontos
 validar_lacre_deslacre.py    confere o cálculo contra a planilha finalizada
-validar_sm.py, validar_app_uso.py, validar_ocupacao.py, validar_custos.py   idem para o SM, o APP, a Ocupação e os Custos
+validar_sm.py, validar_app_uso.py, validar_ocupacao.py, validar_custos.py, validar_pontualidade.py   idem para o SM, o APP, a Ocupação, os Custos e a Pontualidade
 ```
 
 ## Padrão visual e de idioma

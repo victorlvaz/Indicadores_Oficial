@@ -41,6 +41,16 @@ RELATORIOS = [
     },
     {
         "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("支线准点率", "Pontualidade (Chegada e Saída)"),
+        "arquivo": "paginas/pontualidade_tela.py",
+        "url": "pontualidade",
+        "icone": ":material/schedule:",
+        "descricao": frase("按区域统计到达与发车准点率（集货与散货），含排名、目标、趋势与汇总。",
+                           "Taxa de chegada e de saída no prazo por regional (Coleta e Entrega), "
+                           "ranking, meta, tendência e resumo."),
+    },
+    {
+        "grupo": bi("支线", "Linha secundária"),
         "titulo": bi("装载率", "Taxa de Ocupação"),
         "arquivo": "paginas/ocupacao_tela.py",
         "url": "ocupacao",

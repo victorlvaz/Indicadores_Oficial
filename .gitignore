@@ -9,6 +9,7 @@ venv/
 *.xls
 *.xlsx
 *.xlsm
+*.xlsb
 *.csv
 # ...exceto as listas de apoio do código
 !lacre_deslacre/apoio/*.csv
