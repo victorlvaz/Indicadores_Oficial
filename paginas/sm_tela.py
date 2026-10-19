@@ -96,7 +96,7 @@ def _grafico(tab: pd.DataFrame):
 
 # ---------- Entrada ----------
 manter("sm_gran", "sm_comp", "sm_per_D", "sm_per_W", "sm_per_M", "sm_per_Y", "sm_n_dias", "sm_escala", "sm_x_techis",
-       "smres_vis", "smres_ano", "smres_pil_W", "smres_pil_M")      # não perder filtros ao trocar de relatório
+       "smres_reg", "smres_vis", "smres_ano", "smres_pil_W", "smres_pil_M")      # não perder filtros ao trocar de relatório
 
 # ---------- Banco ----------
 try:

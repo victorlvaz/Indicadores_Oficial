@@ -13,7 +13,7 @@ from comum.graficos_plotly import cobertura, mini_graficos
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import opcao_valida
 from . import textos as tx
-from .calculos import resumo, resumo_regionais, tabela_periodo
+from .calculos import regioes_da, resumo, resumo_regionais, tabela_periodo
 from .config import TIPOS
 
 VISOES = ("D", "W", "M")
@@ -36,7 +36,7 @@ def _tabela(df: pd.DataFrame):
     return cru, txt.style.apply(lambda _: est, axis=None)
 
 
-def _secao(base, tipo, freq, per, ini_ano, fim_ano, export):
+def _secao(base, tipo, regional, freq, per, ini_ano, fim_ano, export):
     """per = semana/mês clicado (os gráficos passam a mostrar os dias dele); None = o ano inteiro em `freq`."""
     st.subheader(tx.subtitulo_resumo(tipo))
     if per is None:
@@ -45,6 +45,12 @@ def _secao(base, tipo, freq, per, ini_ano, fim_ano, export):
         ini_p, fim_p, freq_g = per, periodos.fim(per, freq), "D"
     tab = tabela_periodo(base, tipo, ini_p, fim_p)
     total, regs = tab.iloc[0], tab.iloc[1:]
+    if regional:                                           # uma regional só: o "total" passa a ser o dela
+        regs = regs[regs["regiao"] == regional]
+        if regs.empty:
+            st.info(tx.RES_SEM_DADOS)
+            return
+        total = regs.iloc[0]
     if total["prev"] == 0:
         st.info(tx.RES_SEM_DADOS)
         return
@@ -54,7 +60,8 @@ def _secao(base, tipo, freq, per, ini_ano, fim_ano, export):
     c3.metric(tx.COL_TAXA, pct(total["taxa"]))
     if per is not None:
         ant = periodos.anterior(per, freq)
-        t_ant = tabela_periodo(base, tipo, ant, periodos.fim(ant, freq)).iloc[0]["taxa"]
+        tab_ant = tabela_periodo(base, tipo, ant, periodos.fim(ant, freq))
+        t_ant = (tab_ant[tab_ant["regiao"] == regional] if regional else tab_ant.iloc[[0]])["taxa"].iloc[0]
         delta = "" if pd.isna(t_ant) or pd.isna(total["taxa"]) else pp(total["taxa"] - t_ant).replace("▲ ", "").replace("▼ ", "")
         c4.metric(f"{tx.COMP_LEGENDA}: {periodos.rotulo_curto(ant, freq)}", pct(t_ant), delta or None, delta_color="off")
     else:
@@ -67,13 +74,15 @@ def _secao(base, tipo, freq, per, ini_ano, fim_ano, export):
 
     st.markdown(f"**{tx.RES_MINI}**")
     rr = resumo_regionais(base, tipo, freq_g, ini_p, fim_p)
+    if regional:
+        rr = rr[rr["regiao"] == regional]
     ordem = list(dict.fromkeys(rr["periodo"]))
     st.plotly_chart(mini_graficos(rr, list(dict.fromkeys(rr["regiao"])), ordem, tx.RES_GRAF_TAXA), width="stretch",
                     theme="streamlit", config={"displayModeBar": False}, key=f"smres_mini_{tipo}")
     if rr["taxa"].isna().any():
         st.caption(tx.RES_LACUNA)
 
-    serie = resumo(base, tipo, freq_g, None, ini_p, fim_p)
+    serie = resumo(base, tipo, freq_g, regional, ini_p, fim_p)
     cru, estilizada = _tabela(serie)
     with st.expander(tx.RES_TABELA):
         st.dataframe(estilizada, width="stretch", hide_index=True, height=min((len(cru) + 1) * 35 + 3, 420))
@@ -88,7 +97,13 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
     anos = sorted(base["dia"].dt.year.unique(), reverse=True)
     opcoes_ano = anos + [None]
     opcao_valida("smres_ano", opcoes_ano)
-    f1, f2 = st.columns(2)
+    todas = regioes_da(base)
+    opcoes_reg = ["*"] + todas                       # "*" = todas (None viraria o texto "Choose an option")
+    opcao_valida("smres_reg", opcoes_reg)
+    f0, f1, f2 = st.columns(3)
+    regional = f0.selectbox(tx.RES_REGIONAL, opcoes_reg, key="smres_reg",
+                            format_func=lambda r: tx.RES_TODAS if r == "*" else r)
+    regional = None if regional == "*" else regional
     atual = datetime.now().year
     ano = f1.selectbox(tx.RES_ANO, opcoes_ano, index=anos.index(atual) if atual in anos else 0, key="smres_ano",
                        format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
@@ -109,4 +124,4 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
             if per is not None:
                 st.caption(f"{tx.RES_DIAS_DE}: {periodos.rotulo(per, freq)}")
     for tipo in TIPOS:
-        _secao(base, tipo, freq, per, ini_ano, fim_ano, export)
+        _secao(base, tipo, regional, freq, per, ini_ano, fim_ano, export)
