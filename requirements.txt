@@ -8,3 +8,4 @@ plotly>=5.20
 #   psycopg2-binary   (PostgreSQL)      pymssql  (Azure SQL / SQL Server)      pymysql   (MySQL)
 pymssql>=2.3      # só é usado se a URL do banco começar com mssql+pymssql
 psycopg2-binary>=2.9   # só é usado se a URL do banco começar com postgresql+psycopg2 (Neon)
+pyxlsb

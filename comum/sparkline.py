@@ -61,9 +61,10 @@ def _svg(valores: list, largura=150, altura=34, margem=7, vmin=None, vmax=None) 
 
 
 def tabela_tendencia_html(t, n_dias: int = 6, n_valores: int = 2, escala_comum: bool = False,
-                          unidade: tuple = ("天", "dias")) -> str:
+                          unidade: tuple = ("天", "dias"), fmt=None) -> str:
     """t = saída de calculos.tendencia(): colunas [região, variação, acumulado, dd/mm, dd/mm, ...].
     Mostra os últimos `n_valores` dias em % e a linha dos últimos `n_dias` dias."""
+    fmt = fmt or _pct                                    # como mostrar os números (padrão: percentual)
     col_regiao = t.columns[0]
     dias = list(t.columns[3:])
     usados = dias[-n_dias:]
@@ -89,7 +90,7 @@ def tabela_tendencia_html(t, n_dias: int = 6, n_valores: int = 2, escala_comum: 
         destaque = pos == 0
         estilo = f"background:{DESTAQUE};font-weight:700;" if destaque else ""
         tds = f'<td style="{base}text-align:left;{estilo}">{html.escape(str(t.loc[i, col_regiao]))}</td>'
-        tds += "".join(f'<td style="{base}{estilo}">{_pct(t.loc[i, d])}</td>' for d in mostrados)
+        tds += "".join(f'<td style="{base}{estilo}">{fmt(t.loc[i, d])}</td>' for d in mostrados)
         tds += f'<td style="{base}padding:2px 8px;{estilo}">{_svg(series[i], vmin=vmin, vmax=vmax)}</td>'
         linhas.append(f"<tr>{tds}</tr>")
 

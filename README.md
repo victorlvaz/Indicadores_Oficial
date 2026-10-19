@@ -50,6 +50,33 @@ excluir rotas do mesmo SC (coletas e entregas), excluir Franqueados e, se o tran
 conhecido da viagem. Todas as regionais (inclusive GP, CE, BA e SR) entram no total, como na planilha do Lucas.
 Validar: `python validar_app_uso.py "Taxa_uso_de_APP.xlsx" ["relatorio_bruto.xls"]`.
 
+## Custos (物流成本指标)
+
+Mede o custo do transporte da linha secundária: viagens, pacotes, KM, frete total, frete por KM e frete por pacote, por
+regional, por regional × tipo de veículo e por regional × tipo de transportadora.
+
+**Como carregar:** na barra lateral, selecione de uma vez os arquivos "Fretes Diarios" de todas as regionais (aba
+`支线 用车成本模板- SECUNDARIA`) e clique em "Salvar no histórico". A regional é identificada pelo nome do arquivo (ex.:
+`10_GP_…`); se o nome não tiver a sigla, o app pede para escolher. As colunas são lidas pelo nome do cabeçalho, porque o
+layout muda entre regionais. Reenviar o arquivo de uma regional substitui os dias que ele cobre.
+
+**Regras:**
+- Frete total = frete da rota + ônus/bônus + aluguel + combustível + motorista + depreciação + manutenção + seguro + IPVA +
+  pedágio + outras despesas (igual à coluna FRETE TOTAL da Base da planilha).
+- Mesmo ID de viagem com os mesmos valores (frete, pacotes, KM e destino): conta uma vez. Com valores diferentes: as
+  linhas ficam e os fretes são somados. Os dois casos aparecem na aba Auditoria.
+- Tipo de transportadora vazio aparece como "Não informado" (a regional não preencheu).
+- Tipo de veículo é padronizado como na aba Apoio da planilha (Cavalo/Baú → CARRETA, Fiorino → UTILITÁRIO, "03/abr" → 3/4 …).
+- Pacotes ou KM zerados não são completados por nenhum relatório do JMS (ainda); aparecem na Auditoria como pendência.
+
+**Auditoria:** pendências de preenchimento por regional (frete zerado, sem pacotes, sem KM, sem rota, sem tipo de
+transportadora), lista de viagens a cobrar e IDs repetidos.
+
+**Ainda não implementado:** conferência do frete lançado contra as tabelas de frete das regionais (aguardando as tabelas
+atualizadas) e leitura direta do SharePoint da Controladoria.
+
+Validar: `python validar_custos.py "planilha_pronta.xlsx" "arquivo_BA.xlsx" "arquivo_GP.xlsx"`.
+
 ## Taxa de Ocupação (装载率)
 Mesmo relatório do SM ("Consulta de Viagens Secundárias"), mas **um único arquivo** com Coleta e Entrega, sem TECHIS.
 Ocupação = pedidos mãe carregados / capacidade do tipo de veículo (tabela `CAPACIDADE` em `ocupacao/config.py`), somados
@@ -76,12 +103,14 @@ paginas/
   sm_tela.py                 tela do SM
   app_uso_tela.py            tela da Taxa de Uso de APP
   ocupacao_tela.py           tela da Taxa de Ocupação
+  custos_tela.py             tela dos Custos
 lacre_deslacre/              regras e cálculos do Lacre/Deslacre
   config.py  calculos.py  textos.py  apoio/*.csv
   historico.py  gravar/ler o histórico no banco     resumo_ui.py  aba Resumo
 sm/                          regras e cálculos do SM (config, calculos, textos, historico, resumo_ui, apoio/*.csv)
 app_uso/                     regras e cálculos da Taxa de Uso de APP (config, calculos, textos, historico, resumo_ui)
 ocupacao/                    regras e cálculos da Taxa de Ocupação (idem)
+custos/                      regras e cálculos dos Custos (idem)
 comum/                       partes reaproveitadas por todos os relatórios
   banco.py      conexão com o banco (SQLite por padrão, URL da empresa por configuração)
   periodos.py   dia/semana/mês/ano e comparação      graficos.py  gráficos vermelho/cinza
@@ -90,7 +119,7 @@ comum/                       partes reaproveitadas por todos os relatórios
   estilos.py    cor de meta nas tabelas      exportar.py   Excel
   sparkline.py  tabela de tendência com mini-gráficos de linha e pontos
 validar_lacre_deslacre.py    confere o cálculo contra a planilha finalizada
-validar_sm.py, validar_app_uso.py, validar_ocupacao.py   idem para o SM, o APP e a Ocupação
+validar_sm.py, validar_app_uso.py, validar_ocupacao.py, validar_custos.py   idem para o SM, o APP, a Ocupação e os Custos
 ```
 
 ## Padrão visual e de idioma

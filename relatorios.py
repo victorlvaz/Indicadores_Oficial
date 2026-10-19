@@ -49,4 +49,14 @@ RELATORIOS = [
                            "Ocupação dos veículos por regional e tipo de veículo (Coleta e Entrega), "
                            "tendência e resumo."),
     },
+    {
+        "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("物流成本指标", "Indicadores de Custos"),
+        "arquivo": "paginas/custos_tela.py",
+        "url": "custos",
+        "icone": ":material/payments:",
+        "descricao": frase("按区域、车型和承运商类型统计运费、公里与包裹，含单票成本、每公里成本、趋势与稽核。",
+                           "Frete total, KM e pacotes por regional, tipo de veículo e tipo de transportadora, "
+                           "frete por pacote e por KM, tendência e auditoria de preenchimento."),
+    },
 ]
