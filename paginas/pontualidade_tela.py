@@ -1,25 +1,19 @@
 """Página: 支线准点率 / Pontualidade Linha Secundária — Taxa de Chegada e Taxa de Saída (dados vêm do histórico no banco)."""
-import io
-
 import pandas as pd
 import streamlit as st
 
 from comum import banco, periodos
+from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
-from comum.uploads import esvaziar, manter, opcao_valida, remover, upload_persistente
+from comum.uploads import manter, opcao_valida
 from pontualidade import historico, resumo_ui, textos as tx
-from pontualidade.calculos import comparar, ler_relatorio, preparar, rotular_tabela, tabela_periodo, tendencia, visao
+from pontualidade.calculos import comparar, rotular_tabela, tabela_periodo, tendencia, visao
 from pontualidade.config import IND, TIPOS
 
 cabecalho(*tx.PAGINA)
-
-
-@st.cache_data(show_spinner=False, max_entries=4)
-def _ler_cache(conteudo: bytes) -> pd.DataFrame:
-    return ler_relatorio(io.BytesIO(conteudo))
 
 
 @st.cache_data(show_spinner="Carregando histórico…", max_entries=2)
@@ -57,34 +51,8 @@ except Exception as erro:
     st.error(tx.ERRO_BANCO + str(erro))
     st.stop()
 
-# ---------- Carga: sobe o relatório e salva no histórico ----------
-st.sidebar.header(tx.HIST)
-st.sidebar.caption(f"{tx.BANCO_EM_USO}: {banco.descricao()}")
-arquivos = upload_persistente("pontual", tx.UPLOAD, ["xls", "xlsx"], tx.UPLOAD_AJUDA)
-if arquivos:
-    st.sidebar.caption(tx.PENDENTE)
-    if st.sidebar.button(tx.SALVAR, type="primary", help=tx.SALVAR_AJUDA, key="pt_salvar"):
-        salvos, erros, resumos = [], [], []
-        for arq in arquivos:                                   # cada arquivo é independente: o erro de um não impede os outros
-            try:
-                with st.spinner(tx.SALVANDO + arq.name, show_time=True):      # arquivo grande: leitura leva de 30 s a 2 min
-                    df = _ler_cache(arq.getvalue())
-                    b, d, descartadas = preparar(df)
-                    resumos.append((arq.name, historico.salvar(eng, b, arq.name, len(df), descartadas)))
-                salvos.append(arq.name)
-            except ValueError as erro:
-                erros.append(f"{arq.name}: {erro}")
-            except Exception as erro:
-                erros.append(f"{arq.name}: {tx.ERRO_BANCO}{erro}")
-        if salvos:
-            remover("pontual", salvos)
-        st.session_state["pt_msg_erro"] = erros
-        st.session_state["pt_msg_salvo"] = [f"{nome}: {r['novas']} novos · {r['atualizadas']} atualizados" for nome, r in resumos]
-        st.rerun()
-for linha in st.session_state.pop("pt_msg_salvo", []):
-    st.sidebar.success(f"{tx.SALVO_OK} — {linha}")
-for linha in st.session_state.pop("pt_msg_erro", []):
-    st.sidebar.error(linha)
+# ---------- Carga: sobe o relatório consolidado (alimenta Lacre, Uso de APP e Pontualidade) ----------
+painel_carga(eng)
 
 if versao[0] == 0:
     st.info(tx.INFO_SEM_ARQUIVO)

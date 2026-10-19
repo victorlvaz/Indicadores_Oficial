@@ -85,6 +85,13 @@ do mesmo SC, sem Franqueados; a Coleta ignora pedido mãe vazio/0/1 e a Entrega 
 planilha do Lucas. Tipo de veículo sem capacidade (ex.: BARCO) aparece em aviso na aba Base. Tabelas `oc_viagens`, `oc_cargas`.
 Validar: `python validar_ocupacao.py "relatorio_bruto.xls" "OCUPAÇÃO_SECUNDÁRIA.xlsx" 2026-10-14`.
 
+## Carga única do relatório consolidado
+Lacre/Deslacre, Taxa de Uso de APP e Pontualidade usam o **mesmo arquivo** (Relatório consolidado da linha secundária).
+O envio é igual nas três telas (`comum/consolidado.py`): ao clicar em **Salvar no histórico**, o arquivo é lido uma vez e
+grava nos três históricos, cada um com as suas regras. Se um relatório falhar, os outros são gravados e o erro aparece com
+o nome do relatório; o arquivo só sai da lista quando foi para os três. O SM e a Ocupação usam outro arquivo (Rastreamento) e
+os Custos usam as planilhas de frete, então mantêm o envio próprio. Para um relatório novo que use o consolidado, acrescente-o em `_destinos()`.
+
 ## Pontualidade (支线准点率): Taxa de Chegada e Taxa de Saída
 Uma tela com seletor **Chegada / Saída**, alimentada pelo mesmo arquivo: o *Relatório consolidado da linha secundária*
 (Coleta e Entrega juntas). Cada linha é um **trecho** da viagem. Regras (conferidas contra `Taxa_de_Chegada` e `Taxa_de_Saída`):
@@ -128,6 +135,7 @@ ocupacao/                    regras e cálculos da Taxa de Ocupação (idem)
 custos/                      regras e cálculos dos Custos (idem)
 pontualidade/                regras e cálculos da Pontualidade (idem)
 comum/                       partes reaproveitadas por todos os relatórios
+  consolidado.py  envio único do relatório consolidado (Lacre, Uso de APP e Pontualidade)
   banco.py      conexão com o banco (SQLite por padrão, URL da empresa por configuração)
   periodos.py   dia/semana/mês/ano e comparação      graficos.py  gráficos vermelho/cinza
   tema.py       cores (VERMELHO = "#E60000")

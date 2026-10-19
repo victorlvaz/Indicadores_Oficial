@@ -1,27 +1,19 @@
 """Página: 支线解封车率 / Lacre / Deslacre Linha Secundária (dados vêm do histórico no banco)."""
-import io
-
 import pandas as pd
 import streamlit as st
 
 from comum import banco
+from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
-from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
+from comum.uploads import manter, opcao_valida
 from lacre_deslacre import historico, periodos, resumo_ui, textos as tx
-from lacre_deslacre.calculos import (carregar_apoio, comparar, ler_relatorio, preparar, rotular_tabela,
-                                     tabela_periodo, tendencia)
+from lacre_deslacre.calculos import comparar, rotular_tabela, tabela_periodo, tendencia
 from lacre_deslacre.config import INDICADORES
 
 cabecalho(*tx.PAGINA)
-
-
-@st.cache_data(show_spinner=False, max_entries=8)
-def _ler_cache(conteudo: bytes) -> pd.DataFrame:
-    """Lê o Excel uma única vez por arquivo."""
-    return ler_relatorio(io.BytesIO(conteudo))
 
 
 @st.cache_data(show_spinner="Carregando histórico…", max_entries=2)
@@ -52,30 +44,8 @@ except Exception as erro:                                  # banco fora do ar, s
     st.error(tx.ERRO_BANCO + str(erro))
     st.stop()
 
-# ---------- Carga: sobe o relatório e salva no histórico ----------
-st.sidebar.header(tx.HIST)
-st.sidebar.caption(f"{tx.BANCO_EM_USO}: {banco.descricao()}")
-arquivos = upload_persistente("lacre", tx.UPLOAD, ["xls", "xlsx"], tx.UPLOAD_AJUDA)
-if arquivos:
-    st.sidebar.caption(tx.PENDENTE)
-    if st.sidebar.button(tx.SALVAR, type="primary", help=tx.SALVAR_AJUDA, key="lac_salvar"):
-        apoio, resumos = carregar_apoio(), []
-        try:
-            for arq in arquivos:
-                df = _ler_cache(arq.getvalue())
-                b, d = preparar(df, apoio)                 # as regras são fixas (ver lacre_deslacre/config.py)
-                resumos.append((arq.name, historico.salvar(eng, b, arq.name, len(df))))
-        except ValueError as erro:
-            st.sidebar.error(str(erro))
-        except Exception as erro:
-            st.sidebar.error(tx.ERRO_BANCO + str(erro))
-        else:
-            esvaziar("lacre")
-            st.session_state["lac_msg_salvo"] = [
-                f"{nome}: {r['novas']} novas · {r['atualizadas']} atualizadas" for nome, r in resumos]
-            st.rerun()
-for linha in st.session_state.pop("lac_msg_salvo", []):
-    st.sidebar.success(f"{tx.SALVO_OK} — {linha}")
+# ---------- Carga: sobe o relatório consolidado (alimenta Lacre, Uso de APP e Pontualidade) ----------
+painel_carga(eng)
 
 if versao[0] == 0:
     st.info(tx.INFO_SEM_ARQUIVO)

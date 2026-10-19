@@ -1,26 +1,19 @@
 """Página: 支线打卡率 / Taxa de Uso de APP Linha Secundária (dados vêm do histórico no banco)."""
-import io
-
 import pandas as pd
 import streamlit as st
 
 from app_uso import historico, resumo_ui, textos as tx
-from app_uso.calculos import (calcular_partes, carregar_apoio, comparar, ler_relatorio, preparar, rotular_tabela,
-                              tabela_periodo, tendencia, tipos_do_arquivo)
+from app_uso.calculos import comparar, rotular_tabela, tabela_periodo, tendencia
 from app_uso.config import INDICADORES
 from comum import banco, periodos
+from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
-from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
+from comum.uploads import manter, opcao_valida
 
 cabecalho(*tx.PAGINA)
-
-
-@st.cache_data(show_spinner=False, max_entries=8)
-def _ler_cache(conteudo: bytes) -> pd.DataFrame:
-    return ler_relatorio(io.BytesIO(conteudo))
 
 
 @st.cache_data(show_spinner="Carregando histórico…", max_entries=2)
@@ -50,35 +43,8 @@ except Exception as erro:
     st.error(tx.ERRO_BANCO + str(erro))
     st.stop()
 
-# ---------- Carga: sobe o relatório e salva no histórico ----------
-st.sidebar.header(tx.HIST)
-st.sidebar.caption(f"{tx.BANCO_EM_USO}: {banco.descricao()}")
-arquivos = upload_persistente("appuso", tx.UPLOAD, ["xls", "xlsx"], tx.UPLOAD_AJUDA)
-if arquivos:
-    st.sidebar.caption(tx.PENDENTE)
-    if st.sidebar.button(tx.SALVAR, type="primary", help=tx.SALVAR_AJUDA, key="app_salvar"):
-        apoio, resumos = carregar_apoio(), []
-        try:
-            for arq in arquivos:
-                with st.spinner(tx.SALVANDO + arq.name, show_time=True):      # arquivo grande: leitura leva de 30 s a 2 min
-                    df = _ler_cache(arq.getvalue())
-                with st.spinner(tx.SALVANDO + arq.name, show_time=True):
-                    conhecidos = historico.tipos_conhecidos(eng)
-                    novos = tipos_do_arquivo(df)                       # antes do filtro de franqueado
-                    b, d = preparar(df, apoio, {**conhecidos, **novos})
-                    historico.guardar_tipos(eng, novos)
-                    resumos.append((arq.name, historico.salvar(eng, b, arq.name, len(df))))
-        except ValueError as erro:
-            st.sidebar.error(str(erro))
-        except Exception as erro:
-            st.sidebar.error(tx.ERRO_BANCO + str(erro))
-        else:
-            esvaziar("appuso")
-            st.session_state["app_msg_salvo"] = [
-                f"{nome}: {r['novas']} novas · {r['atualizadas']} atualizadas" for nome, r in resumos]
-            st.rerun()
-for linha in st.session_state.pop("app_msg_salvo", []):
-    st.sidebar.success(f"{tx.SALVO_OK} — {linha}")
+# ---------- Carga: sobe o relatório consolidado (alimenta Lacre, Uso de APP e Pontualidade) ----------
+painel_carga(eng)
 
 if versao[0] == 0:
     st.info(tx.INFO_SEM_ARQUIVO)
