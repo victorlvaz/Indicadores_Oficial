@@ -9,6 +9,8 @@ import pandas as pd
 from sqlalchemy import (Column, Date, DateTime, Index, Integer, MetaData, String, Table, Text, and_, bindparam,
                         delete, func, select)
 
+from comum.sql import apagar_por_chaves  # noqa: E402
+
 meta = MetaData()
 
 trechos = Table(
@@ -105,12 +107,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, descarta
                         pd.to_datetime(existentes["saida_plan"])))
         a_apagar = [k for k in apagar_k if k in exist]
         if a_apagar:
-            cmd = delete(trechos).where(and_(
-                trechos.c.id == bindparam("k_id"), trechos.c.cod_partida == bindparam("k_par"),
-                trechos.c.cod_chegada == bindparam("k_cheg"), trechos.c.saida_plan == bindparam("k_sai")))
-            for i in range(0, len(a_apagar), 5000):
-                con.execute(cmd, [{"k_id": a, "k_par": b, "k_cheg": c, "k_sai": d.to_pydatetime()}
-                                  for a, b, c, d in a_apagar[i:i + 5000]])
+            apagar_por_chaves(con, trechos, CHAVE, [(a, b, c, d.to_pydatetime()) for a, b, c, d in a_apagar])
         regs = _py(df)
         for i in range(0, len(regs), 2000):
             con.execute(trechos.insert(), regs[i:i + 2000])

@@ -12,6 +12,8 @@ import pandas as pd
 from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, and_,
                         bindparam, delete, func, select)
 
+from comum.sql import apagar_por_chaves  # noqa: E402
+
 meta = MetaData()
 
 viagens = Table(
@@ -88,9 +90,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "") -> di
         df["sm_contagem"] = [max(n, int(a)) if pd.notna(a) else n for n, a in zip(df["sm_contagem"], antes)]
         repetidas = [(t, i) for t, i, a in zip(df["tipo"], df["id"], antes) if pd.notna(a)]
         if repetidas:
-            con.execute(delete(viagens).where(and_(viagens.c.tipo == bindparam("k_tipo"),
-                                                   viagens.c.id == bindparam("k_id"))),
-                        [{"k_tipo": t, "k_id": i} for t, i in repetidas])
+            apagar_por_chaves(con, viagens, ["tipo", "id"], repetidas)
         df["carregado_em"] = agora
         df["arquivo"] = arquivo[:250]
         registros = df.astype(object).where(df.notna(), None).to_dict("records")

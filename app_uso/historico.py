@@ -13,6 +13,8 @@ from sqlalchemy import (Column, Date, DateTime, Index, Integer, MetaData, String
 
 from .calculos import calcular_partes
 
+from comum.sql import apagar_por_chaves  # noqa: E402
+
 meta = MetaData()
 
 viagens = Table(
@@ -122,10 +124,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
         repetidas = [k for k in chaves_novas if k in chaves_exist]
 
         if repetidas:
-            apagar = delete(viagens).where(and_(
-                viagens.c.id == bindparam("k_id"), viagens.c.cod_chegada == bindparam("k_cod"),
-                viagens.c.chegada_plan == bindparam("k_plan")))
-            con.execute(apagar, [{"k_id": i, "k_cod": c, "k_plan": p.to_pydatetime()} for i, c, p in repetidas])
+            apagar_por_chaves(con, viagens, CHAVE, [(i, c, p.to_pydatetime()) for i, c, p in repetidas])
         registros = _para_registros(df)
         for r in registros:
             r["chegada_plan"] = r["chegada_plan"].to_pydatetime()
