@@ -62,7 +62,7 @@ TODOS = bi("全部（累计）", "Todos (acumulado)")
 DIA = bi("日期（计划到达）", "Dia (chegada planejada)")                                    # [planilha: 计划到达]
 GRAN = bi("统计周期", "Período de análise")                                              # [revisar]
 GRAN_NOMES = {"D": bi("日", "Dia"), "W": bi("周", "Semana"), "M": bi("月", "Mês"), "Y": bi("年", "Ano")}   # [revisar]
-PERIODO = {"D": DIA, "W": bi("选择周（周一至周日）", "Semana (segunda a domingo)"),         # [revisar]
+PERIODO = {"D": DIA, "W": bi("选择周（周日至周六）", "Semana (domingo a sábado)"),         # [revisar]
            "M": bi("选择月份", "Mês"), "Y": bi("选择年份", "Ano")}
 COMPARAR = bi("对比", "Comparar com")                                                    # [revisar]
 COMP_ANTERIOR = bi("上一周期", "Período anterior")                                       # [revisar]

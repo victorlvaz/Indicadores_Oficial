@@ -107,7 +107,7 @@ Uma tela com seletor **Chegada / Saída**, alimentada pelo mesmo arquivo: o *Rel
   (pequenas diferenças são esperadas: a planilha foi gerada antes de alguns horários reais serem preenchidos).
 
 ## Período e comparação
-- **Período de análise:** Dia, Semana (segunda a domingo), Mês ou Ano, mais a opção *Todos (acumulado)*.
+- **Período de análise:** Dia, Semana (domingo a sábado; o número S## segue a regra do SEMANA.DO.ANO do Excel/WPS: a semana 1 é a que contém 1º de janeiro), Mês ou Ano, mais a opção *Todos (acumulado)*.
 - **Comparar com:** *Período anterior* (dia anterior, semana anterior, mês anterior, ano anterior) ou
   *Mesmo período do ano passado*. As tabelas ganham a taxa comparada e a variação em **pontos percentuais** (▲ subiu,
   ▼ caiu em vermelho). Com *Todos* não há comparação.
