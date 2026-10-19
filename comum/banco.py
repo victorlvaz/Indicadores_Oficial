@@ -10,6 +10,9 @@ Para usar o servidor de banco da empresa, informe só a URL de conexão (o códi
 
 Exemplos de URL (peça à TI: tipo do banco, servidor, porta, nome do banco, usuário e senha):
   PostgreSQL  postgresql+psycopg2://usuario:senha@servidor:5432/banco      (pip install psycopg2-binary)
+  Neon (Postgres grátis, sem CNPJ): postgresql+psycopg2://usuario:senha@HOST.neon.tech/banco?sslmode=require
+  Azure SQL / SQL Server (recomendado no Streamlit Cloud, não precisa de driver ODBC):
+              mssql+pymssql://usuario:senha@SERVIDOR.database.windows.net/banco                     (pip install pymssql)
   SQL Server  mssql+pyodbc://usuario:senha@servidor/banco?driver=ODBC+Driver+17+for+SQL+Server   (pip install pyodbc)
   MySQL       mysql+pymysql://usuario:senha@servidor:3306/banco             (pip install pymysql)
 As tabelas são criadas sozinhas na primeira vez (o usuário precisa de permissão de criar tabelas).
@@ -41,7 +44,12 @@ def engine():
     url = url_banco()
     if url.startswith("sqlite"):
         PASTA_DADOS.mkdir(exist_ok=True)
-    return create_engine(url, pool_pre_ping=True)
+    args = {}
+    if url.startswith("mssql+pymssql"):        # Azure SQL grátis pausa sozinho: a 1ª conexão pode levar ~1 min para acordar
+        args = {"login_timeout": 90, "timeout": 90}
+    elif url.startswith("postgresql"):          # Neon dorme após 5 min sem uso: acorda em poucos segundos na 1ª conexão
+        args = {"connect_timeout": 60}
+    return create_engine(url, pool_pre_ping=True, pool_recycle=240, connect_args=args)
 
 
 def eh_sqlite() -> bool:

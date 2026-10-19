@@ -50,6 +50,41 @@ excluir rotas do mesmo SC (coletas e entregas), excluir Franqueados e, se o tran
 conhecido da viagem. Todas as regionais (inclusive GP, CE, BA e SR) entram no total, como na planilha do Lucas.
 Validar: `python validar_app_uso.py "Taxa_uso_de_APP.xlsx" ["relatorio_bruto.xls"]`.
 
+## Custos (物流成本指标)
+
+Mede o custo do transporte da linha secundária: viagens, pacotes, KM, frete total, frete por KM e frete por pacote, por
+regional, por regional × tipo de veículo e por regional × tipo de transportadora.
+
+**Como carregar:** na barra lateral, selecione de uma vez os arquivos "Fretes Diarios" de todas as regionais (aba
+`支线 用车成本模板- SECUNDARIA`) e clique em "Salvar no histórico". A regional é identificada pelo nome do arquivo (ex.:
+`10_GP_…`); se o nome não tiver a sigla, o app pede para escolher. As colunas são lidas pelo nome do cabeçalho, porque o
+layout muda entre regionais. Reenviar o arquivo de uma regional substitui os dias que ele cobre.
+
+**Regras:**
+- Frete total = frete da rota + ônus/bônus + aluguel + combustível + motorista + depreciação + manutenção + seguro + IPVA +
+  pedágio + outras despesas (igual à coluna FRETE TOTAL da Base da planilha).
+- Mesmo ID de viagem com os mesmos valores (frete, pacotes, KM e destino): conta uma vez. Com valores diferentes: as
+  linhas ficam e os fretes são somados. Os dois casos aparecem na aba Auditoria.
+- Tipo de transportadora vazio aparece como "Não informado" (a regional não preencheu).
+- Tipo de veículo é padronizado como na aba Apoio da planilha (Cavalo/Baú → CARRETA, Fiorino → UTILITÁRIO, "03/abr" → 3/4 …).
+- Pacotes ou KM zerados não são completados por nenhum relatório do JMS (ainda); aparecem na Auditoria como pendência.
+
+**Auditoria:** pendências de preenchimento por regional (frete zerado, sem pacotes, sem KM, sem rota, sem tipo de
+transportadora), lista de viagens a cobrar e IDs repetidos.
+
+**Ainda não implementado:** conferência do frete lançado contra as tabelas de frete das regionais (aguardando as tabelas
+atualizadas) e leitura direta do SharePoint da Controladoria.
+
+Validar: `python validar_custos.py "planilha_pronta.xlsx" "arquivo_BA.xlsx" "arquivo_GP.xlsx"`.
+
+## Taxa de Ocupação (装载率)
+Mesmo relatório do SM ("Consulta de Viagens Secundárias"), mas **um único arquivo** com Coleta e Entrega, sem TECHIS.
+Ocupação = pedidos mãe carregados / capacidade do tipo de veículo (tabela `CAPACIDADE` em `ocupacao/config.py`), somados
+por regional de **origem** e limitados a 100% por regional, como na planilha. Regras: só Concluído e Em Trânsito, sem rotas
+do mesmo SC, sem Franqueados; a Coleta ignora pedido mãe vazio/0/1 e a Entrega ignora 0/1 (vazio conta como 0), igual à
+planilha do Lucas. Tipo de veículo sem capacidade (ex.: BARCO) aparece em aviso na aba Base. Tabelas `oc_viagens`, `oc_cargas`.
+Validar: `python validar_ocupacao.py "relatorio_bruto.xls" "OCUPAÇÃO_SECUNDÁRIA.xlsx" 2026-10-14`.
+
 ## Período e comparação
 - **Período de análise:** Dia, Semana (segunda a domingo), Mês ou Ano, mais a opção *Todos (acumulado)*.
 - **Comparar com:** *Período anterior* (dia anterior, semana anterior, mês anterior, ano anterior) ou
@@ -66,10 +101,16 @@ paginas/
   inicio.py                  página inicial com atalhos
   lacre_deslacre_tela.py     tela do Lacre/Deslacre
   sm_tela.py                 tela do SM
+  app_uso_tela.py            tela da Taxa de Uso de APP
+  ocupacao_tela.py           tela da Taxa de Ocupação
+  custos_tela.py             tela dos Custos
 lacre_deslacre/              regras e cálculos do Lacre/Deslacre
   config.py  calculos.py  textos.py  apoio/*.csv
   historico.py  gravar/ler o histórico no banco     resumo_ui.py  aba Resumo
 sm/                          regras e cálculos do SM (config, calculos, textos, historico, resumo_ui, apoio/*.csv)
+app_uso/                     regras e cálculos da Taxa de Uso de APP (config, calculos, textos, historico, resumo_ui)
+ocupacao/                    regras e cálculos da Taxa de Ocupação (idem)
+custos/                      regras e cálculos dos Custos (idem)
 comum/                       partes reaproveitadas por todos os relatórios
   banco.py      conexão com o banco (SQLite por padrão, URL da empresa por configuração)
   periodos.py   dia/semana/mês/ano e comparação      graficos.py  gráficos vermelho/cinza
@@ -78,6 +119,7 @@ comum/                       partes reaproveitadas por todos os relatórios
   estilos.py    cor de meta nas tabelas      exportar.py   Excel
   sparkline.py  tabela de tendência com mini-gráficos de linha e pontos
 validar_lacre_deslacre.py    confere o cálculo contra a planilha finalizada
+validar_sm.py, validar_app_uso.py, validar_ocupacao.py, validar_custos.py   idem para o SM, o APP, a Ocupação e os Custos
 ```
 
 ## Padrão visual e de idioma
@@ -102,6 +144,51 @@ validar_lacre_deslacre.py    confere o cálculo contra a planilha finalizada
 - Em share.streamlit.io: repositório, branch `main`, arquivo principal `app.py`.
 - Atualizar o app = alterar os arquivos e enviar (commit + push) para o GitHub.
 - Os relatórios são enviados pela própria tela do app; não ficam no repositório.
+
+## Onde o histórico fica guardado (importante no link publicado)
+O histórico é um arquivo SQLite (`dados/historico.db`) e **não vai para o GitHub** (o `.gitignore` bloqueia `dados/` e `*.db`).
+- **No computador:** o arquivo fica na pasta `dados/` e permanece entre uma execução e outra.
+- **No link do Streamlit Cloud:** o arquivo fica no disco do servidor, que é **temporário**. Todos que abrem o link veem o mesmo
+  histórico, e quem salvar um relatório novo atualiza para todos. Mas o histórico **volta vazio** sempre que o app:
+  - é reimplantado (qualquer commit ou upload novo no GitHub);
+  - é reiniciado em "Manage app" > "Reboot app";
+  - hiberna por falta de acesso (cerca de 12 horas) e acorda de novo; nesse caso pode ou não ser apagado, não conte com ele.
+- **Por isso, guarde os relatórios exportados de cada dia (`.xls`).** Se o histórico sumir, basta enviar os arquivos de novo e clicar
+  em "Salvar no histórico" (reenviar o mesmo dia atualiza, não duplica).
+- **Solução definitiva:** colocar o histórico fora do servidor do app, num banco da empresa (veja "Histórico em banco de dados" acima:
+  basta informar a URL em `.streamlit/secrets.toml`) ou em arquivos por dia numa pasta do SharePoint (precisa de um registro de
+  aplicativo no Microsoft Entra, pedido à TI).
+- Depois de cada commit, abra o link, confira se o relatório carrega e, se o histórico tiver sumido, reenvie os arquivos.
+
+### Guardar o histórico no Neon (Postgres grátis, sem CNPJ)
+1. Crie a conta em neon.com (plano Free: 1 GB por projeto; ao passar disso as gravações travam) e um projeto (região mais próxima, ex.: São Paulo).
+2. Em "Connect" copie a *connection string* e monte a URL assim (troque `postgresql://` por `postgresql+psycopg2://` e
+   remova `&channel_binding=require` se aparecer):
+```
+[banco]
+url = "postgresql+psycopg2://USUARIO:SENHA@ep-xxxx.sa-east-1.aws.neon.tech/neondb?sslmode=require"
+```
+3. No Streamlit Cloud: Settings > Secrets > cole o bloco acima. Faça o commit de `comum/banco.py` e `requirements.txt`
+   (já incluem `psycopg2-binary`) e use Reboot app. As tabelas são criadas sozinhas.
+4. Para copiar o histórico do computador: `python migrar_historico.py "URL_DO_NEON"`.
+- O Neon "dorme" após 5 min sem uso e acorda sozinho em alguns segundos; o primeiro acesso pode demorar um pouco.
+- Dados da empresa em conta pessoal: confirme com a TI antes de usar o histórico real.
+
+### Guardar o histórico no Azure SQL (oferta gratuita)
+1. No portal do Azure, crie um **Azure SQL Database** com a oferta gratuita ("Apply free offer": 32 GB e 100 mil vCore-segundos por mês).
+2. Crie o servidor com login e senha de administrador SQL e anote o nome (`SERVIDOR.database.windows.net`).
+3. Em Rede (Networking), ative "Permitir que serviços do Azure acessem o servidor". O Streamlit Cloud não tem IP fixo; a proteção
+   fica por conta do login e da senha (use uma senha forte e confirme com a TI se a regra é aceita na empresa).
+4. No Streamlit Cloud, em Settings > Secrets, cole:
+```
+[banco]
+url = "mssql+pymssql://USUARIO:SENHA@SERVIDOR.database.windows.net/NOMEDOBANCO"
+```
+   (se a senha tiver `@`, `:` ou `/`, troque por `%40`, `%3A` e `%2F`).
+5. Faça o commit de `comum/banco.py` e `requirements.txt` (já inclui `pymssql`) e use Reboot app. As tabelas são criadas sozinhas.
+6. Para copiar o histórico que já existe no computador: `python migrar_historico.py "URL_DO_AZURE"`.
+- O banco gratuito **pausa sozinho** sem uso: o primeiro acesso depois da pausa pode levar cerca de 1 minuto (o app espera até 90 s).
+- Se a franquia mensal acabar, o banco fica pausado até o mês seguinte (sem cobrança, pois o excedente fica desligado).
 
 ## Validar o Lacre/Deslacre
 ```

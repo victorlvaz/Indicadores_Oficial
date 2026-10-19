@@ -77,3 +77,10 @@ def opcao_valida(chave: str, opcoes: list) -> None:
 def esvaziar(chave: str) -> None:
     """Remove todos os arquivos guardados de um uploader (ex.: depois de salvar no banco)."""
     _loja().get(chave, {}).clear()
+
+
+def remover(chave: str, nomes) -> None:
+    """Remove só os arquivos citados (ex.: os que foram salvos), deixando os que deram erro para reenviar/corrigir."""
+    guardados = _loja().get(chave, {})
+    for n in nomes:
+        guardados.pop(n, None)
