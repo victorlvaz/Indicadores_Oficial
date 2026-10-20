@@ -4,9 +4,9 @@ import io
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos
+from comum import banco, periodos, resumo_dia
 from comum.estilos import estilizar_tendencia, pct, pp
-from comum.exportar import para_excel
+from comum.exportar import base_primeiro, para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -181,7 +181,7 @@ with abas[2]:
         export[tx.aba_excel_tendencia(tipo)] = (t_tab, {})
 
 with abas[3]:
-    resumo_ui.mostrar(base, export)
+    resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
 
 with abas[4]:
     sem_cap = sorted(v or "(?)" for v in base.loc[~base["veiculo"].isin(CAPACIDADE), "veiculo"].unique())
@@ -198,7 +198,8 @@ with abas[4]:
     st.caption(f"{len(sub):,}".replace(",", ".") + " linhas · " + per_txt)
     st.dataframe(sub.head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
 
+export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 st.sidebar.download_button(
-    tx.EXPORTAR, data=para_excel(export),
+    tx.EXPORTAR, data=lambda e=export_final: para_excel(e),
     file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

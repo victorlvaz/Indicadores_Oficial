@@ -66,3 +66,12 @@ def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]]) -> bytes:
                 ws.row_dimensions[linha].height = 15 * (nota.count("\n") + 1)
             ws.freeze_panes = "B2"
     return buf.getvalue()
+
+
+ABA_BASE_TRATADA = "已处理数据 Base tratada"
+LIMITE_LINHAS_EXCEL = 1_048_575
+
+
+def base_primeiro(export: dict, base: pd.DataFrame, nome: str = ABA_BASE_TRATADA) -> dict:
+    """Devolve o export com a base já tratada (período escolhido) como PRIMEIRA aba do arquivo."""
+    return {nome[:31]: (base.head(LIMITE_LINHAS_EXCEL), {"sem_pct": True}), **export}

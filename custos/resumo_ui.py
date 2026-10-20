@@ -5,7 +5,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import streamlit as st
 
-from comum import periodos
+from comum import periodos, resumo_dia
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import opcao_valida
 from . import textos as tx
@@ -140,7 +140,7 @@ def _secao(base, regional, freq, ini, fim, export):
     export[tx.RES_SECAO[:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_PACOTE]})
 
 
-def mostrar(base: pd.DataFrame, export: dict) -> None:
+def mostrar(base: pd.DataFrame, export: dict, dia=None) -> None:
     st.caption(tx.RES_NOTA)
     anos = sorted(base["dia"].dt.year.unique(), reverse=True)
     opcoes_ano = anos + [None]
@@ -157,4 +157,5 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
                        format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
     ini, fim = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1), pd.Timestamp(year=ano, month=12, day=31))
     freq, ini, fim = _botoes(base, freq, ini, fim)
+    ini, fim = resumo_dia.aplicar(freq, ini, fim, dia)
     _secao(base, regional, freq, ini, fim, export)

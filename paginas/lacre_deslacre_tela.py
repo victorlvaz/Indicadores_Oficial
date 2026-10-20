@@ -2,10 +2,10 @@
 import pandas as pd
 import streamlit as st
 
-from comum import banco
+from comum import banco, resumo_dia
 from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
-from comum.exportar import para_excel
+from comum.exportar import base_primeiro, para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -138,7 +138,7 @@ for aba, evento in zip(abas[4:6], ["lacre", "deslacre"]):
             export[tx.aba_excel_tendencia(tipo, evento)] = (t_tab, {})
 
 with abas[6]:
-    resumo_ui.mostrar(base, export)
+    resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
 
 with abas[7]:
     st.subheader(tx.SUB_CARGAS)
@@ -152,7 +152,8 @@ with abas[7]:
     st.caption(f"{len(sub):,}".replace(",", ".") + " linhas · " + per_txt)
     st.dataframe(sub.head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
 
+export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 st.sidebar.download_button(
-    tx.EXPORTAR, data=para_excel(export),
+    tx.EXPORTAR, data=lambda e=export_final: para_excel(e),
     file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

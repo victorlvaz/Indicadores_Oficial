@@ -5,7 +5,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos
+from comum import banco, periodos, resumo_dia
 from comum.exportar import para_excel
 from comum.estilos import estilizar_tendencia, pct, pp
 from comum.idioma import cabecalho, rodape
@@ -222,6 +222,7 @@ if ini is not None:
 abas = st.tabs([tx.nome_aba("COLETA"), tx.nome_aba("ENTREGA"), tx.ABA_TENDENCIA, tx.ABA_PENDENTES,
                 tx.ABA_TECHIS, tx.ABA_RESUMO, tx.ABA_BASE])
 export = {}
+bases_export = {}
 
 for aba, tipo in zip(abas[:2], TIPOS):
     with aba:
@@ -337,7 +338,7 @@ with abas[4]:
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
 with abas[5]:
-    resumo_ui.mostrar(base, export)
+    resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
 
 with abas[6]:
     st.subheader(tx.SUB_CARGAS)
@@ -362,9 +363,10 @@ with abas[6]:
                  hide_index=True, height=400)
     for tipo in TIPOS:
         if (sub["tipo"] == tipo).any():
-            export[tx.aba_excel_base(tipo)] = (base_para_exportar(sub, tipo), {"sem_pct": True})
+            bases_export[tx.aba_excel_base(tipo)] = (base_para_exportar(sub, tipo), {"sem_pct": True})
 
 # ---------- Exportar ----------
+export = {**bases_export, **export}                     # a base já tratada (Coleta, Entrega) vem nas primeiras abas
 if techis is not None and st.sidebar.checkbox(tx.EXPORTAR_TECHIS, value=False, key="sm_x_techis"):
     export[tx.ABA_EXCEL_TECHIS] = (techis, {"sem_pct": True})
 st.sidebar.download_button(

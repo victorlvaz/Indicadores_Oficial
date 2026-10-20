@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from comum import periodos
+from comum import periodos, resumo_dia
 from comum.estilos import pct, pp
 from comum.graficos_plotly import cobertura, mini_graficos
 from comum.tema import CINZA_DESTAQUE, VERMELHO
@@ -91,7 +91,7 @@ def _secao(base, tipo, regional, freq, per, ini_ano, fim_ano, export):
     export[tx.aba_excel_resumo(tipo)] = (exp, {"taxa": tx.COL_TAXA, "pp_extra": [tx.COL_VAR]})
 
 
-def mostrar(base: pd.DataFrame, export: dict) -> None:
+def mostrar(base: pd.DataFrame, export: dict, dia=None) -> None:
     """Desenha a aba inteira: Coleta primeiro, depois Entrega."""
     st.caption(tx.RES_NOTA)
     anos = sorted(base["dia"].dt.year.unique(), reverse=True)
@@ -123,5 +123,7 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
                            format_func=lambda p: periodos.rotulo_curto(p, freq, com_ano=ano is None))
             if per is not None:
                 st.caption(f"{tx.RES_DIAS_DE}: {periodos.rotulo(per, freq)}")
+    if freq == "D" and dia is not None:         # visão Dia: segue o dia da barra lateral
+        per, _ = resumo_dia.aplicar(freq, None, None, dia)
     for tipo in TIPOS:
         _secao(base, tipo, regional, freq, per, ini_ano, fim_ano, export)

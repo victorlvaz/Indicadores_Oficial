@@ -4,7 +4,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from comum import periodos
+from comum import periodos, resumo_dia
 from comum.estilos import pct, pp
 from comum.graficos_plotly import mapa_calor, ranking_meta
 from comum.tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERMELHO
@@ -100,7 +100,7 @@ def _secao(base, ind, tipo, regional, freq, ini, fim, export):
     export[tx.aba_excel_resumo(ind, tipo)] = (exp, {"taxa": tx.COL_TAXA[ind], "meta": "目标 Meta", "pp_extra": [tx.COL_VAR]})
 
 
-def mostrar(base: pd.DataFrame, ind: str, export: dict) -> None:
+def mostrar(base: pd.DataFrame, ind: str, export: dict, dia=None) -> None:
     st.caption(tx.RES_NOTA)
     dias = base["dia_chegada" if ind == "CHEGADA" else "dia_saida"]
     anos = sorted(dias.dt.year.unique(), reverse=True)
@@ -120,5 +120,6 @@ def mostrar(base: pd.DataFrame, ind: str, export: dict) -> None:
                        format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
     ini, fim = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1), pd.Timestamp(year=ano, month=12, day=31))
     freq, ini, fim = _botoes(dias, freq, ini, fim)
+    ini, fim = resumo_dia.aplicar(freq, ini, fim, dia)
     for tipo in TIPOS:
         _secao(base, ind, tipo, regional, freq, ini, fim, export)

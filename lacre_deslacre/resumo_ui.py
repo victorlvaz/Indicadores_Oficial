@@ -7,7 +7,7 @@ import streamlit as st
 from comum.estilos import pct, pp
 from comum.graficos import grafico_taxa, grafico_volume
 from comum.tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERMELHO
-from comum import periodos
+from comum import periodos, resumo_dia
 from comum.uploads import opcao_valida
 from . import textos as tx
 from comum.idioma import bi
@@ -97,7 +97,7 @@ def _botoes(base: pd.DataFrame, freq: str, ini, fim):
     return "D", per, periodos.fim(per, freq)
 
 
-def mostrar(base: pd.DataFrame, export: dict) -> None:
+def mostrar(base: pd.DataFrame, export: dict, dia=None) -> None:
     """Desenha a aba inteira. Lacre primeiro, depois Deslacre; cada um com Coleta e Entrega."""
     st.caption(tx.RES_NOTA)
     anos = sorted(base["dia"].dt.year.unique(), reverse=True)
@@ -119,6 +119,7 @@ def mostrar(base: pd.DataFrame, export: dict) -> None:
                        format_func=lambda a: tx.RES_TODO_HISTORICO if a is None else str(a))
     ini, fim = (None, None) if ano is None else (pd.Timestamp(year=ano, month=1, day=1), pd.Timestamp(year=ano, month=12, day=31))
     freq, ini, fim = _botoes(base, freq, ini, fim)
+    ini, fim = resumo_dia.aplicar(freq, ini, fim, dia)
 
     for evento in ("lacre", "deslacre"):
         st.header(bi("封车", "Lacre") if evento == "lacre" else bi("解车", "Deslacre"))
