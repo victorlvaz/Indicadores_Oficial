@@ -165,8 +165,13 @@ if pendente:
 if "sm_msg_salvo" in st.session_state:
     st.sidebar.success(f"{tx.SALVO_OK} — {st.session_state.pop('sm_msg_salvo')}")
 
-# ---------- Base = histórico + o que foi enviado e ainda não salvo ----------
-hist = _historico(versao) if versao[0] else pd.DataFrame()
+# ---------- Base: com arquivo enviado e ainda não salvo, escolhe entre só o enviado ou histórico + enviado ----------
+ver = "hist"
+if novas:
+    ver = st.sidebar.radio(tx.VER_TITULO, ["env", "hist"], key="sm_ver", help=tx.VER_AJUDA,
+                           format_func=lambda v: tx.VER_ENVIADO if v == "env" else tx.VER_HISTORICO)
+so_enviado = bool(novas) and ver == "env"
+hist = _historico(versao) if (versao[0] and not so_enviado) else pd.DataFrame()
 partes = []
 if not hist.empty:
     partes.append(hist)
@@ -183,7 +188,9 @@ if not partes:
     st.stop()
 base = juntar(partes)
 base = aplicar_techis(base, contagem_techis(techis), limitar=LIMITAR_REALIZADO)
-if pendente:
+if so_enviado:
+    st.info(tx.AVISO_SO_ENVIADO)
+elif pendente:
     st.info(tx.PENDENTES_AVISO)
     if techis is None and novas:
         st.warning(tx.INFO_SEM_TECHIS)
