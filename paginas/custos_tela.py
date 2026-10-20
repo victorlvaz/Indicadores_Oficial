@@ -4,7 +4,7 @@ import streamlit as st
 
 from comum import banco, periodos, resumo_dia
 from comum.estilos import estilizar_tendencia  # noqa: F401
-from comum.exportar import base_primeiro, para_excel
+from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -282,7 +282,9 @@ with abas[6]:
     st.dataframe(mostrar, width="stretch", hide_index=True, height=400)
 
 export_final = base_primeiro(export, sub[[c for c in tx.COLUNAS_BASE if c in sub.columns]].rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
+titulo_xl = titulo_relatorio("paginas/custos_tela.py")                       # linha de título do Excel: nome do relatório + data
+periodo_xl = periodo_texto(ini, fim, base["dia"])
 st.sidebar.download_button(
-    tx.EXPORTAR, data=lambda e=export_final: para_excel(e),
+    tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
     file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

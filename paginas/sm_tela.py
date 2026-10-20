@@ -6,7 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from comum import banco, periodos, resumo_dia
-from comum.exportar import para_excel
+from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.estilos import estilizar_tendencia, pct, pp
 from comum.idioma import cabecalho, rodape
 from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
@@ -47,8 +47,8 @@ def _historico(versao: tuple) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
-def _excel(abas: dict) -> bytes:
-    return para_excel(abas)
+def _excel(abas: dict, titulo: str = "", periodo: str = "") -> bytes:
+    return para_excel(abas, titulo, periodo)
 
 
 def _estilizar(tab: pd.DataFrame, comparando: bool):
@@ -370,6 +370,6 @@ export = {**bases_export, **export}                     # a base já tratada (Co
 if techis is not None and st.sidebar.checkbox(tx.EXPORTAR_TECHIS, value=False, key="sm_x_techis"):
     export[tx.ABA_EXCEL_TECHIS] = (techis, {"sem_pct": True})
 st.sidebar.download_button(
-    tx.EXPORTAR, data=_excel(export),
+    tx.EXPORTAR, data=_excel(export, titulo_relatorio("paginas/sm_tela.py"), periodo_texto(ini, fim, base["dia"])),
     file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
     key="sm_down", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
