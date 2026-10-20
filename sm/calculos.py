@@ -169,7 +169,7 @@ def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filt
         diag[tx.DIAG["mesmo_sc"]] = int(sc.sum())
         b = b[~sc]
     if filtro_ponto_coleta and tipo == "COLETA":
-        fora = ~b["partida"].isin(apoio["pontos_coleta"])
+        fora = b["partida"].isin(apoio["pontos_coleta"])        # regra de 20/10: sai da Coleta tudo que tem "Sim" na lista de unidades com coleta
         diag[tx.DIAG["ponto_coleta"]] = int(fora.sum())
         b = b[~fora]
     if filtro_pedido_mae:

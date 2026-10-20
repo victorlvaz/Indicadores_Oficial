@@ -145,7 +145,7 @@ DIAG = {
     "sem_data": bi("无计划出发时间", "Sem horário planejado de saída"),
     "status": bi("剔除：状态非已完成/在途", "Removidas: status fora de Concluído/Em Trânsito"),
     "mesmo_sc": bi("剔除：同场线路", "Removidas: rota do mesmo SC"),
-    "ponto_coleta": bi("剔除：非揽收业务网点", "Removidas: unidade sem operação de coleta"),
+    "ponto_coleta": bi("剔除：揽收业务网点（是）", "Removidas: unidade da lista de coleta (Sim)"),                       # [revisar]
     "franqueado": bi("剔除：加盟商", "Removidas: fornecedor Franqueado"),
     "pedido_mae": bi("剔除：主单数量为空、0 或 1", "Removidas: pedido mãe vazio, 0 ou 1"),
     "usadas": bi("使用行数", "Linhas usadas"),
