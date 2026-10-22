@@ -12,12 +12,14 @@ if not runtime.exists():
 import streamlit as st
 
 from comum.idioma import bi
+from comum.login import botao_sair, exigir_login
 from comum.logo import logo_html
 from comum.tema import CSS_GLOBAL
 from relatorios import RELATORIOS
 
 st.set_page_config(page_title=bi("指标", "Indicadores"), layout="wide")
 st.html(CSS_GLOBAL)
+exigir_login()                      # sem entrar, nada abaixo (menu e relatórios) é mostrado
 st.html(logo_html())
 
 menu = {"": [st.Page("paginas/inicio.py", title=bi("首页", "Início"), icon=":material/home:", default=True)]}
@@ -26,4 +28,6 @@ for r in RELATORIOS:
         st.Page(r["arquivo"], title=r["titulo"], icon=r["icone"], url_path=r["url"])
     )
 
-st.navigation(menu).run()
+pagina = st.navigation(menu)
+botao_sair()
+pagina.run()
