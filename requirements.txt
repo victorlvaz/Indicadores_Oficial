@@ -9,3 +9,6 @@ plotly>=5.20
 pymssql>=2.3      # só é usado se a URL do banco começar com mssql+pymssql
 psycopg2-binary>=2.9   # só é usado se a URL do banco começar com postgresql+psycopg2 (Neon)
 pyxlsb
+
+requests>=2.31       # envio ao Feishu
+pillow>=10           # imagens das tabelas para o Feishu

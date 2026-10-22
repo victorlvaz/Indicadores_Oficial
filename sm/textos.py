@@ -170,6 +170,7 @@ COLUNAS_BASE = {                                                                
     "rota": bi("线路名称", "Nome da rota"),
     "rota_usada": bi("预计次数所用线路", "Rota usada no previsto"),                               # [revisar]
     "tipo_transportador": bi("承运商类型", "Tipo de transportador"),
+    "condutor": bi("司机", "Condutor"),                                                    # [revisar]
     "transportador": bi("承运商简称", "Transportador"),
     "pedido_mae": bi("主单数量", "Pedido mãe"),
     "partida": bi("发车网点", "PDD de saída"),

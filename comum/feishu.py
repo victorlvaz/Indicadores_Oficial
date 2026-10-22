@@ -1,0 +1,113 @@
+"""Envio de mensagens para um grupo do Feishu/Lark por um app (bot) da empresa.
+
+Por que um app e não o "bot personalizado" (webhook): o webhook só aceita texto. Para postar as tabelas como
+IMAGEM é preciso subir a imagem pela API do app (permissão im:resource) e enviar a mensagem com a image_key.
+
+Segredos (Streamlit: Settings > Secrets; local: .streamlit/secrets.toml):
+    [feishu]
+    app_id     = "cli_xxxxxxxx"
+    app_secret = "xxxxxxxx"
+    chat_id    = "oc_xxxxxxxx"                      # grupo de destino (o bot precisa estar no grupo)
+    dominio    = "https://open.feishu.cn"           # Lark internacional: "https://open.larksuite.com"
+    senha      = "opcional"                         # se existir, o envio pede essa senha
+"""
+import json
+
+import requests
+
+DOMINIO_PADRAO = "https://open.feishu.cn"
+TIMEOUT = 30
+LINHA_EM_BRANCO = [{"tag": "text", "text": "\u200b"}]      # parágrafo vazio (espaço de largura zero: o Feishu recusa texto vazio e apara espaços comuns)
+
+
+def configuracao(secrets) -> dict | None:
+    """Lê o bloco [feishu] dos segredos; None se faltar app_id, app_secret ou chat_id."""
+    try:
+        bloco = dict(secrets["feishu"])
+    except Exception:                                   # sem secrets.toml / sem o bloco
+        return None
+    if not all(str(bloco.get(k, "")).strip() for k in ("app_id", "app_secret", "chat_id")):
+        return None
+    bloco["dominio"] = str(bloco.get("dominio") or DOMINIO_PADRAO).rstrip("/")
+    return bloco
+
+
+def _resposta(r: requests.Response, o_que: str) -> dict:
+    try:
+        dados = r.json()
+    except ValueError:
+        raise RuntimeError(f"Feishu ({o_que}): resposta inválida (HTTP {r.status_code}).")
+    if r.status_code != 200 or dados.get("code", 0) != 0:
+        raise RuntimeError(f"Feishu ({o_que}): {dados.get('msg') or r.text[:200]} (código {dados.get('code', r.status_code)})")
+    return dados
+
+
+def token(cfg: dict) -> str:
+    r = requests.post(f"{cfg['dominio']}/open-apis/auth/v3/tenant_access_token/internal",
+                      json={"app_id": cfg["app_id"], "app_secret": cfg["app_secret"]}, timeout=TIMEOUT)
+    return _resposta(r, "autenticação")["tenant_access_token"]
+
+
+def subir_imagem(cfg: dict, tk: str, png: bytes, nome: str = "tabela.png") -> str:
+    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/images", headers={"Authorization": f"Bearer {tk}"},
+                      data={"image_type": "message"}, files={"image": (nome, png, "image/png")}, timeout=TIMEOUT)
+    return _resposta(r, "envio da imagem")["data"]["image_key"]
+
+
+def subir_arquivo(cfg: dict, tk: str, nome: str, dados: bytes) -> str:
+    """Sobe um arquivo qualquer (ex.: o Excel exportado) e devolve o file_key."""
+    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/files", headers={"Authorization": f"Bearer {tk}"},
+                      data={"file_type": "stream", "file_name": nome}, files={"file": (nome, dados)}, timeout=120)
+    return _resposta(r, "envio do arquivo")["data"]["file_key"]
+
+
+def enviar_arquivo(cfg: dict, tk: str, file_key: str) -> str:
+    corpo = {"receive_id": cfg["chat_id"], "msg_type": "file", "content": json.dumps({"file_key": file_key})}
+    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/messages?receive_id_type=chat_id",
+                      headers={"Authorization": f"Bearer {tk}"}, json=corpo, timeout=TIMEOUT)
+    return _resposta(r, "envio da mensagem com o arquivo")["data"]["message_id"]
+
+
+def enviar_post(cfg: dict, tk: str, paragrafos: list) -> str:
+    """paragrafos: lista de linhas; cada linha é lista de elementos do 'post' do Feishu
+    ({"tag": "text", "text": ..., "style": ["bold"]} ou {"tag": "img", "image_key": ...}). Devolve o message_id."""
+    corpo = {"receive_id": cfg["chat_id"], "msg_type": "post",
+             "content": json.dumps({"zh_cn": {"title": "", "content": paragrafos}}, ensure_ascii=False)}
+    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/messages?receive_id_type=chat_id",
+                      headers={"Authorization": f"Bearer {tk}"}, json=corpo, timeout=TIMEOUT)
+    return _resposta(r, "envio da mensagem")["data"]["message_id"]
+
+
+def texto(*partes) -> list:
+    """Linha de texto. Cada parte é "texto" ou ("texto", True) para negrito."""
+    linha = []
+    for p in partes:
+        if not isinstance(p, str) and len(p) == 3:                 # ("@", nome, id_feishu): menção
+            _, nome, uid = p
+            linha.append({"tag": "at", "user_id": uid} if uid else {"tag": "text", "text": f"@{nome}"})
+            continue
+        t, negrito = (p, False) if isinstance(p, str) else p
+        el = {"tag": "text", "text": t}
+        if negrito:
+            el["style"] = ["bold"]
+        linha.append(el)
+    return linha
+
+
+def enviar_relatorio(cfg: dict, itens: list, arquivo: tuple | None = None) -> str:
+    """itens: ("linha", [partes...]) ou ("imagem", png_bytes), na ordem da mensagem (uma mensagem só).
+    arquivo = (nome, bytes): se informado, vai logo depois, em uma segunda mensagem (o Feishu não mistura arquivo com texto)."""
+    tk = token(cfg)
+    chave_arquivo = subir_arquivo(cfg, tk, *arquivo) if arquivo else None      # sobe antes: se falhar, nada foi postado
+    paragrafos = []
+    for i, (tipo, valor) in enumerate(itens):
+        if i:
+            paragrafos.append(LINHA_EM_BRANCO)                 # respiro entre cada frase e cada imagem
+        if tipo == "imagem":
+            paragrafos.append([{"tag": "img", "image_key": subir_imagem(cfg, tk, valor)}])
+        else:
+            paragrafos.append(texto(*valor))
+    mensagem = enviar_post(cfg, tk, paragrafos)
+    if chave_arquivo:
+        enviar_arquivo(cfg, tk, chave_arquivo)
+    return mensagem

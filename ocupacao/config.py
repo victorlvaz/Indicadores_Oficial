@@ -14,6 +14,7 @@ COL = {
     "viagem": ["Nome da viagem"],
     "tipo_linha": ["Tipo de linha"],
     "tipo_transportador": ["Tipo de transportador"],
+    "condutor": ["Condutor"],
     "partida": ["PDD de saida", "PDD de saída"],
     "saida_plan": ["Hora de saída planejada"],
     "placa": ["Placa do carro"],
@@ -21,7 +22,7 @@ COL = {
     "veiculo": ["Tipo de veículo utilizado"],
     "reg_origem": ["Filial/Regional de Origem"],
 }
-COL_OPCIONAIS = {"placa"}
+COL_OPCIONAIS = {"placa", "condutor"}
 
 # Regionais, na ordem da tabela detalhada da planilha. Qualquer regional nova que apareça nos dados entra no fim.
 REGIOES = ["SPE", "SPS", "SPN", "RJ", "MG", "PR", "CE", "BA", "GP", "SR"]

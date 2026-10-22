@@ -11,9 +11,11 @@ COL = {
     "viagem": "Nome da viagem",
     "tipo_linha": "Tipo de linha",
     "tipo_transportador": "Tipo de transportador",
+    "condutor": "Condutor",                  # motorista (opcional)
     "pedido_mae": 'Número de " Pedido mãe"',
     "partida": "Nome de estação de partida",
     "reg_saida": "Regional de saída do carro",
+    "chegada": "Nome de estação de chegada",
     "reg_chegada": "Regional de chegada do carro",
     "cod_chegada": "Código de estação de chegada",
     "chegada_plan": "Tempo de chegada planejado",

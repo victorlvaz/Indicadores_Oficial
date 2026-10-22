@@ -5,7 +5,7 @@ atualiza as linhas e acrescenta as novas, sem duplicar."""
 from datetime import datetime
 
 import pandas as pd
-from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, delete, func,
+from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, delete, func, inspect,
                         select)
 
 from .calculos import completar
@@ -21,6 +21,7 @@ viagens = Table(
     Column("viagem", String(150)),
     Column("tipo_linha", String(20)),
     Column("tipo_transportador", String(80)),
+    Column("condutor", String(120)),
     Column("partida", String(150)),
     Column("reg_origem", String(30)),
     Column("placa", String(30)),
@@ -50,6 +51,10 @@ _COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)
+    colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
+    if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
+        with engine.begin() as con:
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN condutor VARCHAR(120)")
 
 
 def _para_registros(df: pd.DataFrame) -> list[dict]:
@@ -109,7 +114,7 @@ def ler(engine) -> pd.DataFrame:
     df["saida_plan"] = pd.to_datetime(df["saida_plan"])
     df["dia"] = pd.to_datetime(df["dia"])
     df["volume"] = pd.to_numeric(df["volume"], errors="coerce")
-    for c in ("placa", "veiculo", "reg_origem"):
+    for c in ("placa", "veiculo", "reg_origem", "condutor"):
         df[c] = df[c].fillna("")
     return completar(df)
 

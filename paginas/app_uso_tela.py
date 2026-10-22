@@ -5,7 +5,7 @@ import streamlit as st
 from app_uso import historico, resumo_ui, textos as tx
 from app_uso.calculos import comparar, rotular_tabela, tabela_periodo, tendencia
 from app_uso.config import INDICADORES
-from comum import banco, periodos, resumo_dia
+from comum import banco, feishu_envio, periodos, resumo_dia
 from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
@@ -148,7 +148,16 @@ with abas[4]:
 export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 titulo_xl = titulo_relatorio("paginas/app_uso_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, base["dia"])
+nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
 st.sidebar.download_button(
     tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
-    file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
+    file_name=nome_xl,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+feishu_envio.botao(
+    chave="app", ini=ini, fim=fim, dias=base["dia"], export=export, titulo=titulo_xl, periodo_xl=periodo_xl, nome_xl=nome_xl,
+    excel=lambda: para_excel(export_final, titulo_xl, periodo_xl),
+    abertura=("Segue a Taxa de Registro no APP da Secundária do dia {d}.", "以下是{d}支线打卡率。"),
+    blocos=[("img", "USO DO APP na **COLETA**:", [tx.aba_excel_tabela("COLETA")]),
+            ("img", "USO DO APP na **ENTREGA**:", [tx.aba_excel_tabela("ENTREGA")]),
+            ("img", "**TENDÊNCIA** USO DO APP:", [tx.aba_excel_tendencia("COLETA"), tx.aba_excel_tendencia("ENTREGA")]),
+            ("comentario",)])

@@ -148,7 +148,7 @@ def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filt
     b = pd.concat([b, df], axis=1)          # colunas originais do JMS seguem junto (para exportar a base)
     b["sm_real_hist"] = real_hist
 
-    for c in ("id", "status", "viagem", "rota", "tipo_transportador", "partida", "regiao"):
+    for c in ("id", "status", "viagem", "rota", "tipo_transportador", "condutor", "partida", "regiao"):
         b[c] = b[c].fillna("").astype(str).str.strip()
     b["tipo"] = tipo
     b["saida_plan"] = pd.to_datetime(b["saida_plan"], errors="coerce", format="mixed")
@@ -189,7 +189,7 @@ def preparar_jms(df: pd.DataFrame, tipo: str, apoio: dict | None = None, *, filt
     return b[INTERNAS + originais].reset_index(drop=True), diag
 
 
-INTERNAS = ["tipo", "id", "status", "viagem", "rota", "rota_usada", "tipo_transportador", "transportador", "pedido_mae",
+INTERNAS = ["tipo", "id", "status", "viagem", "rota", "rota_usada", "tipo_transportador", "condutor", "transportador", "pedido_mae",
             "partida", "chegada", "saida_plan", "placa", "regiao", "regiao_destino", "dia", "sm_prev",
             "sm_real_hist"]
 
@@ -210,6 +210,10 @@ def base_para_exportar(base: pd.DataFrame, tipo: str) -> pd.DataFrame:
         if k in sub.columns:
             n = nomes[0]
             out[n] = out[n].where(out[n].notna(), sub[k]) if n in out.columns else sub[k]
+    if "Condutor" in out.columns and "Tipo de transportador" in out.columns:      # motorista logo depois do tipo de transportador
+        cols = [c for c in out.columns if c != "Condutor"]
+        cols.insert(cols.index("Tipo de transportador") + 1, "Condutor")
+        out = out[cols]
     out[COLUNAS_CALCULADAS["rota"]] = sub["rota_usada"].str.split("-").str[:-2].str.join("-")
     out[COLUNAS_CALCULADAS["sm_prev"]] = sub["sm_prev"]
     if "sm_real" in sub:

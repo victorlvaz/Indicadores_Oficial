@@ -2,12 +2,11 @@
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos, resumo_dia
+from comum import banco, feishu_envio, lideres, periodos
 from comum.estilos import estilizar_tendencia  # noqa: F401
-from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
+from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
-from comum import janela as janela_ui
 from comum.tema import CINZA_DESTAQUE, VERMELHO
 from comum.uploads import manter, opcao_valida, remover, upload_persistente
 from custos import historico, resumo_ui, textos as tx
@@ -59,13 +58,14 @@ def _rotular(t: pd.DataFrame) -> pd.DataFrame:
                              "frete_km_comp": tx.COL_COMP_KM, "var_km": tx.COL_VAR_KM})
 
 
-def _para_exportar(tab, comp):
+def _para_exportar(tab, comp, titulo=None):
+    """titulo: nome completo para a imagem do Feishu (o nome da aba do Excel é cortado em 31 caracteres)."""
     exp = tab.copy()
     if comp:
         for c in (tx.COL_VAR_PACOTE, tx.COL_VAR_KM):
             exp[c] = exp[c] * 100
-        return exp, {"custos": True, "pp_extra": [tx.COL_VAR_PACOTE, tx.COL_VAR_KM]}
-    return exp, {"custos": True}
+        return exp, {"custos": True, "pp_extra": [tx.COL_VAR_PACOTE, tx.COL_VAR_KM], "titulo_img": titulo}
+    return exp, {"custos": True, "titulo_img": titulo}
 
 
 manter("cures_reg", "cures_vis", "cures_ano", "cures_pil_W", "cures_pil_M", "cu_gran", "cu_comp", "cu_per_D", "cu_per_W",
@@ -178,7 +178,7 @@ with abas[0]:
     st.dataframe(_estilo(tab, [tab.columns[0], tx.COL_REGIAO], comp), width="stretch", hide_index=True,
                  height=(len(tab) + 1) * 35 + 3)
     _legenda_comp(atual)
-    export[tx.SUB_REGIONAL[:31]] = (*_para_exportar(tab, comp), tx.nota_texto())
+    export[tx.SUB_REGIONAL[:31]] = (*_para_exportar(tab, comp, tx.SUB_REGIONAL), tx.nota_texto())
     rodape(*tx.NOTAS)
 
 # --- por veículo / por tipo de transportadora ---
@@ -194,13 +194,12 @@ for aba, dim, sub, nome in ((abas[1], "veiculo", tx.SUB_VEICULO, "veiculo"), (ab
         _legenda_comp(atual if comp else pd.DataFrame({"frete_pacote_comp": [float("nan")]}))
         if dim == "tipo_transp":
             st.caption(tx.NAO_INFORMADO_NOTA)
-        export[sub[:31]] = _para_exportar(tab, comp)
+        export[sub[:31]] = _para_exportar(tab, comp, sub)
         rodape(*tx.NOTAS)
 
 # --- tendência ---
 with abas[3]:
     metrica = st.radio(tx.METRICA, list(tx.METRICAS), horizontal=True, key="cu_metrica", format_func=lambda m: tx.METRICAS[m])
-    n_tab = janela_ui.escolher(gran, "cu_janela")
     t = tendencia(base, metrica, gran, fim)
     if not t.empty:
         st.subheader(tx.SUB_TEND[metrica])
@@ -210,19 +209,18 @@ with abas[3]:
                                                    "Y": ("年", "anos")}[gran]))
         else:
             st.info(tx.INFO_UM_DIA)
-        t_tab = tendencia(base, metrica, gran, fim, janela=n_tab) if t.shape[1] > 4 else t
         with st.expander(tx.RES_TABELA):
-            vis = t_tab.copy()
+            vis = t.copy()
             for c in vis.columns[1:]:
                 vis[c] = vis[c].map(variacao if c == tx.COL_VAR_TEND else brl)
             st.dataframe(vis, width="stretch", hide_index=True)
-        exp = t_tab.copy()
+        exp = t.copy()
         exp[tx.COL_VAR_TEND] = exp[tx.COL_VAR_TEND] * 100
-        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND]})
+        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND], "titulo_img": tx.SUB_TEND[metrica]})
 
 # --- resumo ---
 with abas[4]:
-    resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
+    resumo_ui.mostrar(base, export)
 
 # --- auditoria ---
 with abas[5]:
@@ -281,10 +279,46 @@ with abas[6]:
     mostrar = sub[[c for c in tx.COLUNAS_BASE if c in sub.columns]].head(5000).rename(columns=tx.COLUNAS_BASE)
     st.dataframe(mostrar, width="stretch", hide_index=True, height=400)
 
-export_final = base_primeiro(export, sub[[c for c in tx.COLUNAS_BASE if c in sub.columns]].rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
-titulo_xl = titulo_relatorio("paginas/custos_tela.py")                       # linha de título do Excel: nome do relatório + data
-periodo_xl = periodo_texto(ini, fim, base["dia"])
 st.sidebar.download_button(
-    tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
+    tx.EXPORTAR, data=para_excel(export),
     file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# ---------- Envio para o Feishu ----------
+def _cobranca() -> list:
+    """Linhas de cobrança: regionais com viagens sem 'tipo de transportadora' no período, com os líderes do cadastro."""
+    try:
+        cad = lideres.ler(eng)
+    except Exception:
+        cad = pd.DataFrame(columns=lideres.COLUNAS)
+    pend = pendencias_por_regional(base, ini, fim)
+    pend = pend[(pend["regiao"] != TOTAL) & (pend["tipo"] > 0)]
+    linhas = []
+    if len(pend):
+        linhas += [("linha", _partes_bold("Preencher a coluna **TIPO DE TRANSPORTADORA**:")),
+                   ("linha", ["请填写“承运商类型”列："])]          # [revisar]
+        for reg in pend["regiao"]:
+            m = lideres.mencoes(cad, reg)
+            linhas.append(("linha", [(f"{reg}", True), " - "] + (m or ["(sem líder cadastrado)"])))
+    ctrl = lideres.mencoes(cad, lideres.CONTROLADORIA)
+    if ctrl:
+        linhas.append(("linha", ctrl))
+    return linhas
+
+
+def _partes_bold(t: str) -> list:
+    return [(x, True) if i % 2 else x for i, x in enumerate(t.split("**")) if x]
+
+
+_nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
+feishu_envio.botao(
+    chave="cus", ini=ini, fim=fim, dias=base["dia"], export=export, titulo="", periodo_xl=per_txt, nome_xl=_nome_xl,
+    excel=lambda: para_excel(export),
+    abertura=("📊 Indicadores de Custos referente ao dia {d}.", "以下是{d}支线物流成本指标。"),
+    blocos=[("linha", "Base de dados: Report das regionais à Controladoria."),
+            ("linha", "数据来源：各区域向财务管控部报送的报表。"),
+            ("img", "**Visão geral**", [tx.SUB_REGIONAL[:31]]),
+            ("img", "**Custos por Veículo**", [tx.SUB_VEICULO[:31]]),
+            ("img", "**Custo por Tipo de Transportador**", [tx.SUB_TIPO[:31]]),
+            ("comentario",), ("linhas", _cobranca())])

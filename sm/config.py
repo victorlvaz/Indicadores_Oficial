@@ -19,6 +19,7 @@ COL_JMS = {
     "viagem": ["Nome da viagem"],
     "rota": ["Nome da rota"],                      # coluna G do JMS: a rota correta; vazia nas Horas Extras
     "tipo_transportador": ["Tipo de transportador"],
+    "condutor": ["Condutor"],
     "transportador": ["Abreviatura de transportador"],
     "pedido_mae": ['Número de " Pedido mãe"', 'Número de "Pedido mãe"', "Número de Pedido mãe"],
     "partida": ["PDD de saida", "PDD de saída"],
@@ -29,7 +30,7 @@ COL_JMS = {
     "regiao_destino": ["Filial/Regional de destino"],
 }
 # opcionais: se não existirem no arquivo, ficam vazias
-COL_JMS_OPCIONAIS = {"transportador", "chegada", "placa", "regiao_destino", "rota"}
+COL_JMS_OPCIONAIS = {"condutor", "transportador", "chegada", "placa", "regiao_destino", "rota"}
 
 # Anotação: remover do relatório do JMS
 COLUNAS_REMOVER = ["Km Google", "CHECK-IN"]

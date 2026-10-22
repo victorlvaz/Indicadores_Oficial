@@ -10,7 +10,7 @@ from datetime import datetime
 
 import pandas as pd
 from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, and_,
-                        bindparam, delete, func, select)
+                        bindparam, delete, func, inspect, select)
 
 from comum.sql import apagar_por_chaves  # noqa: E402
 
@@ -27,6 +27,7 @@ viagens = Table(
     Column("rota", String(150)),
     Column("rota_usada", String(150)),
     Column("tipo_transportador", String(80)),
+    Column("condutor", String(120)),
     Column("transportador", String(80)),
     Column("pedido_mae", Float),
     Column("partida", String(150)),
@@ -56,12 +57,16 @@ cargas = Table(
 
 CHAVE = ["tipo", "id"]
 _COLUNAS = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo")]
-_TEXTOS = ["status", "viagem", "rota", "rota_usada", "tipo_transportador", "transportador", "partida", "chegada",
+_TEXTOS = ["status", "viagem", "rota", "rota_usada", "tipo_transportador", "condutor", "transportador", "partida", "chegada",
            "placa", "regiao", "regiao_destino"]
 
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)
+    colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
+    if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
+        with engine.begin() as con:
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN condutor VARCHAR(120)")
 
 
 def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "") -> dict:

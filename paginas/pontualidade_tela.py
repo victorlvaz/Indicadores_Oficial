@@ -2,7 +2,7 @@
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos, resumo_dia
+from comum import banco, feishu_envio, periodos, resumo_dia
 from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
@@ -162,7 +162,17 @@ with abas[4]:
 export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 titulo_xl = titulo_relatorio("paginas/pontualidade_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, dias)
+nome_xl = tx.arquivo_excel(ind, "Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
 st.sidebar.download_button(
     tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
-    file_name=tx.arquivo_excel(ind, "Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
+    file_name=nome_xl,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+_nome_ind = {"SAIDA": ("Saída", "SAÍDA", "发车"), "CHEGADA": ("Chegada", "CHEGADA", "到达")}[ind]
+feishu_envio.botao(
+    chave="pt_" + ind.lower(), ini=ini, fim=fim, dias=dias, export=export, titulo=titulo_xl, periodo_xl=periodo_xl, nome_xl=nome_xl,
+    excel=lambda: para_excel(export_final, titulo_xl, periodo_xl),
+    abertura=(f"Segue a Taxa de {_nome_ind[0]} da Secundária do dia {{d}}.", f"以下是{{d}}支线{_nome_ind[2]}准点率。"),
+    blocos=[("img", f"{_nome_ind[1]} **COLETA**:", [tx.aba_excel_tabela(ind, "COLETA")]),
+            ("img", f"{_nome_ind[1]} **ENTREGA**:", [tx.aba_excel_tabela(ind, "ENTREGA")]),
+            ("img", f"{_nome_ind[1]} **Tendência** COLETA / ENTREGA:", [tx.aba_excel_tendencia(ind, "COLETA"), tx.aba_excel_tendencia(ind, "ENTREGA")]),
+            ("comentario",)])

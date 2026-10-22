@@ -53,8 +53,10 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
     b = df[list(cols.values())].rename(columns={v: k for k, v in cols.items()})
     if "placa" not in b.columns:
         b["placa"] = ""
+    if "condutor" not in b.columns:
+        b["condutor"] = ""
 
-    for c in ("id", "status", "viagem", "tipo_transportador", "partida", "reg_origem", "veiculo"):
+    for c in ("id", "status", "viagem", "tipo_transportador", "condutor", "partida", "reg_origem", "veiculo"):
         b[c] = b[c].fillna("").astype(str).str.strip()
     b["id"] = b["id"].str.upper()
     b = b[b["id"].ne("") & b["id"].ne("NAN")]

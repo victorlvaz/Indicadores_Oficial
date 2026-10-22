@@ -36,16 +36,19 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
              filtro_franqueado=True, filtro_pedido_mae=True):
     """Retorna (base tratada, diagnóstico de linhas removidas por regra)."""
     apoio = apoio or carregar_apoio()
-    faltando = [nome for nome in COL.values() if nome not in df.columns]
+    opcionais = {COL["chegada"], COL["condutor"]}                      # relatório sem o nome da estação de chegada ainda é aceito
+    faltando = [nome for nome in COL.values() if nome not in df.columns and nome not in opcionais]
     if faltando:
         raise ValueError(tx.ERRO_COLUNAS + ", ".join(faltando))
 
     inverso = {nome: chave for chave, nome in COL.items()}
-    b = df[list(COL.values())].rename(columns=inverso).copy()
+    b = df.reindex(columns=list(COL.values())).rename(columns=inverso).copy()
     b = b[b["id"].astype(str).str.strip().ne("任务单号")]          # linha de cabeçalho em chinês, se existir
 
     for c in ("status", "viagem", "partida", "reg_saida", "reg_chegada", "tipo_transportador"):
         b[c] = b[c].astype(str).str.strip()
+    b["chegada"] = b["chegada"].where(b["chegada"].notna(), "").astype(str).str.strip()
+    b["condutor"] = b["condutor"].where(b["condutor"].notna(), "").astype(str).str.strip()
     b["tipo_linha"] = b["tipo_linha"].astype(str).str.strip().str.upper()
     b["chegada_plan"] = pd.to_datetime(b["chegada_plan"], errors="coerce")
     b["dia"] = b["chegada_plan"].dt.normalize()

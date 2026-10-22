@@ -5,7 +5,7 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos, resumo_dia
+from comum import banco, feishu_envio, periodos, resumo_dia
 from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.estilos import estilizar_tendencia, pct, pp
 from comum.idioma import cabecalho, rodape
@@ -376,7 +376,16 @@ with abas[6]:
 export = {**bases_export, **export}                     # a base já tratada (Coleta, Entrega) vem nas primeiras abas
 if techis is not None and st.sidebar.checkbox(tx.EXPORTAR_TECHIS, value=False, key="sm_x_techis"):
     export[tx.ABA_EXCEL_TECHIS] = (techis, {"sem_pct": True})
+titulo_xl = titulo_relatorio("paginas/sm_tela.py")
+periodo_xl = periodo_texto(ini, fim, base["dia"])
+nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
 st.sidebar.download_button(
-    tx.EXPORTAR, data=_excel(export, titulo_relatorio("paginas/sm_tela.py"), periodo_texto(ini, fim, base["dia"])),
-    file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
+    tx.EXPORTAR, data=_excel(export, titulo_xl, periodo_xl), file_name=nome_xl,
     key="sm_down", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+feishu_envio.botao(
+    chave="sm", ini=ini, fim=fim, dias=base["dia"], export=export, titulo=titulo_xl, periodo_xl=periodo_xl, nome_xl=nome_xl,
+    excel=lambda: _excel(export, titulo_xl, periodo_xl),
+    abertura=("Segue a estatística de Status dos SMs de Coleta e Entrega do dia {d}.", "以下是{d}支线集货-散货SM状态统计。"),
+    blocos=[("img", "SMs **COLETA**:", [tx.aba_excel_tabela("COLETA")]),
+            ("img", "SMs **ENTREGA**:", [tx.aba_excel_tabela("ENTREGA")]),
+            ("comentario",)])

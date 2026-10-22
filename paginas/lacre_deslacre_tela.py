@@ -2,7 +2,7 @@
 import pandas as pd
 import streamlit as st
 
-from comum import banco, resumo_dia
+from comum import banco, feishu_envio, resumo_dia
 from comum.consolidado import painel_carga
 from comum.estilos import estilizar_tabela, estilizar_tendencia
 from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
@@ -155,7 +155,49 @@ with abas[7]:
 export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 titulo_xl = titulo_relatorio("paginas/lacre_deslacre_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, base["dia"])
+nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
 st.sidebar.download_button(
     tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
-    file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
+    file_name=nome_xl,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+feishu_envio.botao(
+    chave="lac", ini=ini, fim=fim, dias=base["dia"], export=export, titulo=titulo_xl, periodo_xl=periodo_xl, nome_xl=nome_xl,
+    excel=lambda: para_excel(export_final, titulo_xl, periodo_xl),
+    abertura=("Segue a Taxa de **Lacre** e **Deslacre** da Secundária do dia {d}.", "以下是{d}二次封签和拆签的费用。"),
+    blocos=[("img", [("Lacre " if ev == "lacre" else "Deslacre ", False), (tp, True), (":", False)], [tx.aba_excel_tabela(tp, ev)])
+            for tp, ev in INDICADORES] + [("comentario",)])
+
+
+# ---------- Exportar um intervalo livre (de/até): o acumulado do período escolhido, comparado ao intervalo anterior de mesmo tamanho ----------
+with st.sidebar.expander(tx.PER_EXPORT):
+    st.caption(tx.PER_EXPORT_AJUDA)
+    d_min, d_max = base["dia"].min().date(), base["dia"].max().date()
+    faixa = st.date_input(tx.PER_EXPORT_DATAS, value=(max(d_min, d_max.replace(day=1)), d_max),
+                          min_value=d_min, max_value=d_max, key="lac_faixa", format="DD/MM/YYYY")
+    if len(faixa) != 2:
+        st.caption(tx.PER_EXPORT_ESCOLHA)
+    else:
+        f_ini, f_fim = pd.Timestamp(faixa[0]), pd.Timestamp(faixa[1])
+        sub_f = base[(base["dia"] >= f_ini) & (base["dia"] <= f_fim)]
+        if sub_f.empty:
+            st.caption(tx.PER_EXPORT_VAZIO)
+        else:
+            def _excel_faixa(ini_f=f_ini, fim_f=f_fim):
+                n = (fim_f - ini_f).days + 1
+                c_fim, c_ini = ini_f - pd.Timedelta(days=1), ini_f - pd.Timedelta(days=n)
+                exp_f = {}
+                for tipo, evento in INDICADORES:
+                    atual_f = comparar(tabela_periodo(base, tipo, evento, ini_f, fim_f),
+                                       tabela_periodo(base, tipo, evento, c_ini, c_fim))
+                    t_f = rotular_tabela(atual_f, tipo, evento)
+                    c_taxa, c_meta = t_f.columns[4], t_f.columns[5]
+                    t_f[tx.COL_VAR] = t_f[tx.COL_VAR] * 100
+                    exp_f[tx.aba_excel_tabela(tipo, evento)] = (
+                        t_f, {"taxa": c_taxa, "meta": c_meta, "pct_extra": [tx.COL_COMP], "pp_extra": [tx.COL_VAR]},
+                        tx.nota_texto(evento))
+                exp_f = base_primeiro(exp_f, base[(base["dia"] >= ini_f) & (base["dia"] <= fim_f)].rename(columns=tx.COLUNAS_BASE))
+                return para_excel(exp_f, titulo_xl, periodo_texto(ini_f, fim_f, base["dia"]))
+            st.download_button(
+                tx.PER_EXPORT_BOTAO, data=_excel_faixa, key="lac_baixar_faixa",
+                file_name=tx.arquivo_excel(f"{f_ini:%d.%m}-{f_fim:%d.%m}"),
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

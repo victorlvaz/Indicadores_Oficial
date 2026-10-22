@@ -105,6 +105,26 @@ def nota_texto(evento: str) -> str:
 EXPORTAR = bi("导出 Excel (.xlsx)", "Exportar tudo para Excel")                          # [revisar]
 
 
+BOT_BOTAO = bi("发送到飞书群", "Enviar para o Feishu")                                   # [revisar]
+BOT_AJUDA = frase("把四张表（集货/散货 封车/解车）作为图片发送到运输群。", "Posta as 4 tabelas (Coleta/Entrega, Lacre/Deslacre) como imagem no grupo de transportes.")   # [revisar]
+BOT_TITULO = bi("发送到飞书群", "Enviar para o Feishu")                                  # [revisar]
+BOT_PREVIA = frase("预览：将按此内容发送。", "Prévia: é exatamente isto que será postado no grupo.")   # [revisar]
+BOT_SEM_CONFIG = ("Envio não configurado. Em Settings > Secrets do Streamlit (ou .streamlit/secrets.toml) crie o bloco [feishu] com "
+                  "app_id, app_secret e chat_id (veja comum/feishu.py).")
+BOT_SENHA = bi("发送密码", "Senha de envio")                                            # [revisar]
+BOT_CONFIRMAR = bi("确认发送", "Confirmar envio")                                       # [revisar]
+BOT_COM_EXCEL = "Enviar também o Excel exportado (em uma 2ª mensagem) / 同时发送导出的 Excel（第二条消息）"      # [revisar]
+BOT_ENVIANDO = "Enviando…"
+BOT_ENVIADO = frase("已发送到飞书群。", "Mensagem enviada ao grupo.")                    # [revisar]
+BOT_ERRO = "Não foi possível enviar: "
+PER_EXPORT = bi("自定义区间导出", "Exportar período personalizado")                 # [revisar]
+PER_EXPORT_AJUDA = frase("选择起止日期（计划到达日），导出该区间的汇总。", "Escolha de/até (dia de chegada planejada); o Excel traz o acumulado do intervalo.")   # [revisar]
+PER_EXPORT_DATAS = bi("起止日期", "De – Até")                                          # [revisar]
+PER_EXPORT_ESCOLHA = frase("请选择开始和结束日期。", "Escolha a data inicial e a final.")  # [revisar]
+PER_EXPORT_VAZIO = frase("该区间没有数据。", "Não há dados nesse intervalo.")              # [revisar]
+PER_EXPORT_BOTAO = bi("导出区间 Excel (.xlsx)", "Exportar intervalo para Excel")        # [revisar]
+
+
 def arquivo_excel(sufixo: str) -> str:
     return f"支线解封车率_Lacre_Deslacre_{sufixo}.xlsx"
 
@@ -151,9 +171,11 @@ COLUNAS_BASE = {
     "viagem": bi("任务名称", "Nome da viagem"),
     "tipo_linha": bi("线路类型", "Tipo de linha"),
     "tipo_transportador": bi("承运商类型", "Tipo de transportador"),
+    "condutor": bi("司机", "Condutor"),                                                    # [revisar]
     "pedido_mae": bi("主单数量", "Pedido mãe"),
     "partida": bi("发车网点名称", "Estação de partida"),
     "reg_saida": bi("发车所属代理区", "Regional de saída"),
+    "chegada": bi("到车网点名称", "Estação de Chegada"),                                  # [revisar]
     "reg_chegada": bi("到车所属代理区", "Regional de chegada"),
     "cod_chegada": bi("到车网点编码", "Código de estação de chegada"),
     "chegada_plan": bi("计划到达时间", "Chegada planejada"),

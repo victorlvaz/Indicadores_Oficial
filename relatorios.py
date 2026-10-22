@@ -69,4 +69,13 @@ RELATORIOS = [
                            "Frete total, KM e pacotes por regional, tipo de veículo e tipo de transportadora, "
                            "frete por pacote e por KM, tendência e auditoria de preenchimento."),
     },
+    {
+        "grupo": bi("设置", "Cadastros"),
+        "titulo": bi("区域负责人", "Líderes regionais"),
+        "arquivo": "paginas/lideres_tela.py",
+        "url": "lideres",
+        "icone": ":material/group:",
+        "descricao": frase("登记各区域负责人，用于成本催办消息中的 @ 提醒。",
+                           "Cadastro dos líderes de cada regional, usado na cobrança e nas menções do Feishu."),
+    },
 ]

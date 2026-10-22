@@ -26,9 +26,11 @@ viagens = Table(
     Column("viagem", String(150)),
     Column("tipo_linha", String(20)),
     Column("tipo_transportador", String(80)),
+    Column("condutor", String(120)),
     Column("pedido_mae", Float),
     Column("partida", String(150)),
     Column("reg_saida", String(30)),
+    Column("chegada", String(150)),
     Column("reg_chegada", String(30)),
     Column("hora_lacre", String(40)),
     Column("hora_deslacre", String(40)),
@@ -59,6 +61,14 @@ _COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)                       # só cria o que não existe
+    colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
+    if "chegada" not in colunas:                  # banco criado antes do nome da estação de chegada: acrescenta a coluna
+        with engine.begin() as con:
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN chegada VARCHAR(150)")
+    colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
+    if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
+        with engine.begin() as con:
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN condutor VARCHAR(120)")
 
 
 def _para_registros(df: pd.DataFrame) -> list[dict]:
@@ -124,8 +134,12 @@ def ler(engine) -> pd.DataFrame:
         df = pd.read_sql(select(*[viagens.c[c] for c in _COLUNAS_BASE]), con)
     df["chegada_plan"] = pd.to_datetime(df["chegada_plan"])
     df["dia"] = pd.to_datetime(df["dia"])
+    df["condutor"] = df["condutor"].fillna("")
     df["lacrado"] = df["lacrado"].astype(int)
     df["deslacrado"] = df["deslacrado"].astype(int)
+    # dias salvos antes da coluna existir: completa o nome pela estação (código) já conhecida em outros dias
+    nomes = df.loc[df["chegada"].fillna("").ne(""), ["cod_chegada", "chegada"]].drop_duplicates("cod_chegada").set_index("cod_chegada")["chegada"]
+    df["chegada"] = df["chegada"].where(df["chegada"].fillna("").ne(""), df["cod_chegada"].map(nomes))
     return df
 
 

@@ -102,7 +102,8 @@ DIAG = {
 
 COLUNAS_BASE = {
     "id": bi("任务单号", "Número do ID"), "status": bi("任务状态", "Status"), "viagem": bi("任务名称", "Nome da viagem"),
-    "tipo_linha": bi("线路类型", "Tipo de linha"), "tipo_transportador": bi("承运商类型", "Tipo de transportador"),
+    "tipo_linha": bi("线路类型", "Tipo de linha"), "tipo_transportador": bi("承运商类型", "Tipo de transportador"), "condutor": bi("司机", "Condutor"),   # [revisar]
+   
     "partida": bi("发车网点名称", "Estação de partida"), "reg_saida": bi("发车所属代理区", "Regional de saída"),
     "reg_chegada": bi("到车所属代理区", "Regional de chegada"), "cod_chegada": bi("到车网点编码", "Código de estação de chegada"),
     "chegada_plan": bi("计划到达时间", "Chegada planejada"), "hora_checkout": bi("司机出车打卡时间", "Check-out do motorista"),   # [revisar]

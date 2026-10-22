@@ -4,7 +4,7 @@ import io
 import pandas as pd
 import streamlit as st
 
-from comum import banco, periodos, resumo_dia
+from comum import banco, feishu_envio, periodos, resumo_dia
 from comum.estilos import estilizar_tendencia, pct, pp
 from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
@@ -201,7 +201,21 @@ with abas[4]:
 export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
 titulo_xl = titulo_relatorio("paginas/ocupacao_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, base["dia"])
+nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
 st.sidebar.download_button(
     tx.EXPORTAR, data=lambda e=export_final, t=titulo_xl, d=periodo_xl: para_excel(e, t, d),
-    file_name=tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", ".")),
+    file_name=nome_xl,
     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+feishu_envio.botao(
+    chave="oc", ini=ini, fim=fim, dias=base["dia"], export=export, titulo=titulo_xl, periodo_xl=periodo_xl, nome_xl=nome_xl,
+    excel=lambda: para_excel(export_final, titulo_xl, periodo_xl),
+    abertura=("Indicadores de Taxa de Ocupação referente ao dia {d}.", "以下是{d}支线装载率指标。"),
+    blocos=[("linha", "Base de dados: JMS (coleta e entrega)"), ("linha", "数据来源：JMS（集货与散货）"),
+            ("img", None, [tx.aba_excel_tabela("COLETA")]),
+            ("img", None, [tx.aba_excel_tabela("ENTREGA")]),
+            ("comentario",),
+            ("linha", "Segue abaixo, no detalhe, a volumetria carregada por cada tipo de veículo."),
+            ("linha", "以下是按车型统计的装载量明细。"),
+            ("linha", "Volumes Previsto x Volumes Carregados (Realizado)"),
+            ("img", "**COLETA**:", [tx.aba_excel_detalhe("COLETA")]),
+            ("img", "**ENTREGA**:", [tx.aba_excel_detalhe("ENTREGA")])])
