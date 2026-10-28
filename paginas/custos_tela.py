@@ -76,7 +76,7 @@ try:
     eng = banco.engine()
     versao = historico.versao(eng)
 except Exception as erro:
-    st.error(tx.ERRO_BANCO + str(erro))
+    st.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
     st.stop()
 
 # ---------- Carga (vários arquivos de uma vez) ----------
@@ -110,7 +110,7 @@ if arquivos:
             except ValueError as erro:
                 erros.append(f"{arq.name}  \n{erro}")
             except Exception as erro:
-                erros.append(f"{arq.name}  \n{tx.ERRO_BANCO}{erro}")
+                erros.append(f"{arq.name}  \n{tx.ERRO_BANCO}{str(erro).split("[SQL:")[0].strip()[:400]}")
         remover("custos", [n for n, _, _ in resumos])
         st.session_state["cu_msg_salvo"] = [
             f"{nome} ({reg}): {r['novas']} novas · {r['atualizadas']} atualizadas" for nome, reg, r in resumos]
@@ -214,9 +214,13 @@ with abas[3]:
             for c in vis.columns[1:]:
                 vis[c] = vis[c].map(variacao if c == tx.COL_VAR_TEND else brl)
             st.dataframe(vis, width="stretch", hide_index=True)
-        exp = t.copy()
+        if gran == "W" and ini is not None:      # semana: o Excel traz os dias da semana
+            _td = tendencia(base[base["dia"] >= pd.Timestamp(ini)], metrica, "D", fim)
+            exp = _td.copy() if not _td.empty else t.copy()
+        else:
+            exp = t.copy()
         exp[tx.COL_VAR_TEND] = exp[tx.COL_VAR_TEND] * 100
-        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND], "titulo_img": tx.SUB_TEND[metrica]})
+        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND], "sparkline": True, "titulo_img": tx.SUB_TEND[metrica]})
 
 # --- resumo ---
 with abas[4]:

@@ -42,16 +42,72 @@ def titulo_relatorio(arquivo_tela: str) -> str:
     return next((r["titulo"] for r in RELATORIOS if r["arquivo"] == arquivo_tela), "")
 
 
+COL_SPARK = "近七天趋势 Tendência 7 dias"
+COR_LINHA_SPARK = "FF376092"           # Estilo de Mini Gráfico Escuro #5: linha azul
+COR_PONTO_SPARK = "FFD00000"           # pontos vermelho-escuro do mesmo estilo
+
+
+def _injetar_sparklines(dados: bytes, sparks: list) -> bytes:
+    """Acrescenta mini-gráficos de linha (sparklines do Excel/WPS) às abas de tendência.
+    sparks = [(índice da aba, nome, 1ª linha de dados, última, 1ª coluna dos dias, última, coluna do gráfico)].
+    O openpyxl não escreve sparklines; elas entram direto no XML da aba (extensão x14), uma por regional, no fim da linha."""
+    import re
+    import zipfile
+    from openpyxl.utils import get_column_letter as L
+    from xml.sax.saxutils import escape
+
+    por_aba = {}
+    for idx, nome, l1, l2, c1, c2, cs in sparks:
+        ref = "'" + nome.replace("'", "''") + "'"
+        linhas = "".join(
+            f"<x14:sparkline><xm:f>{escape(ref)}!{L(c1)}{r}:{L(c2)}{r}</xm:f><xm:sqref>{L(cs)}{r}</xm:sqref></x14:sparkline>"
+            for r in range(l1, l2 + 1))
+        por_aba[idx + 1] = (
+            '<extLst><ext uri="{05C60535-1F16-4fd2-B633-F4F36F0B64E0}" '
+            'xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main">'
+            '<x14:sparklineGroups xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">'
+            '<x14:sparklineGroup displayEmptyCellsAs="gap" markers="1" lineWeight="1.25">'
+            f'<x14:colorSeries rgb="{COR_LINHA_SPARK}"/><x14:colorNegative rgb="{COR_LINHA_SPARK}"/><x14:colorAxis rgb="FF000000"/>'
+            f'<x14:colorMarkers rgb="{COR_PONTO_SPARK}"/><x14:colorFirst rgb="{COR_PONTO_SPARK}"/><x14:colorLast rgb="{COR_PONTO_SPARK}"/>'
+            f'<x14:colorHigh rgb="{COR_PONTO_SPARK}"/><x14:colorLow rgb="{COR_PONTO_SPARK}"/>'
+            f'<x14:sparklines>{linhas}</x14:sparklines></x14:sparklineGroup></x14:sparklineGroups></ext></extLst>')
+    entrada, saida = zipfile.ZipFile(io.BytesIO(dados)), io.BytesIO()
+    with zipfile.ZipFile(saida, "w", zipfile.ZIP_DEFLATED) as z:
+        for item in entrada.infolist():
+            conteudo = entrada.read(item.filename)
+            m = re.fullmatch(r"xl/worksheets/sheet(\d+)\.xml", item.filename)
+            if m and int(m.group(1)) in por_aba:
+                xml = conteudo.decode("utf-8")
+                conteudo = xml.replace("</worksheet>", por_aba[int(m.group(1))] + "</worksheet>").encode("utf-8")
+            z.writestr(item, conteudo)
+    return saida.getvalue()
+
+
+def sem_ba_na_coleta(nome: str, df: pd.DataFrame) -> pd.DataFrame:
+    """A regional BA não tem coleta: sai das tabelas de COLETA do export (a base tratada não é mexida)."""
+    n = str(nome)
+    if not any(k in n for k in ("集货", "COLETA", "Coleta")) or n.startswith(("已处理", "支线跟踪")) or df.shape[1] < 2:
+        return df
+    ba = df.iloc[:, :3].apply(lambda c: c.astype(str).str.strip().eq("BA")).any(axis=1)
+    return df[~ba].reset_index(drop=True) if ba.any() else df
+
+
 def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]], titulo: str = "", periodo: str = "") -> bytes:
     """abas: {nome da aba: (dataframe, {"taxa": coluna, "meta": coluna} ou {})}
     titulo/periodo: se informados, cada aba de indicador ganha uma linha mesclada no topo (nome do relatório + data)."""
     buf = io.BytesIO()
+    sparks, sparks_abas = [], []
     with pd.ExcelWriter(buf, engine="openpyxl") as writer:
         for nome, item in abas.items():
             df, cols = item[0], item[1]
             nota = item[2] if len(item) > 2 else ""
             nome = nome[:31]
             o = 1 if (titulo and not cols.get("sem_pct") and not cols.get("sem_titulo")) else 0   # linhas acima do cabeçalho
+            if cols.get("sparkline") and df.shape[1] >= 4:           # tendência: coluna extra, no fim, para o mini-gráfico
+                sparks.append((len(sparks_abas), nome, o + 2, o + 1 + len(df), max(4, df.shape[1] - 6), df.shape[1], df.shape[1] + 1))   # últimos 7 dias
+                df = df.copy()
+                df[COL_SPARK] = ""
+            sparks_abas.append(nome)
             df.to_excel(writer, sheet_name=nome, index=False, startrow=o)
             ws = writer.sheets[nome]
             colunas = list(df.columns)
@@ -69,14 +125,19 @@ def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]], titulo: str = "", per
 
             for i, c in enumerate(colunas, start=1):
                 eh_pct = df[c].dtype.kind == "f" and (c == cols.get("meta") or c == cols.get("taxa")
-                                                     or c in cols.get("pct_extra", ()) or not cols)
+                                                     or c in cols.get("pct_extra", ()) or not {k for k in cols if k != "sparkline"})
                 if eh_pct:
                     for cel in ws[get_column_letter(i)][o + 1:]:
                         cel.number_format = "0.00%"
+                if c in cols.get("reais", ()):                     # valores em reais
+                    for cel in ws[get_column_letter(i)][o + 1:]:
+                        cel.number_format = '"R$" #,##0.00'
                 if c in cols.get("pp_extra", ()):                  # valores já em pontos percentuais
                     for cel in ws[get_column_letter(i)][o + 1:]:
                         cel.number_format = '+0.00" p.p.";-0.00" p.p.";0.00" p.p."'
                 ws.column_dimensions[get_column_letter(i)].width = max(10, min(len(str(c)) // 2 + 6, 28))
+                if c == COL_SPARK:
+                    ws.column_dimensions[get_column_letter(i)].width = 26
 
             if ws.max_row >= o + 2 and not cols.get("sem_pct"):                               # linha de total (1ª): cinza e negrito
                 for cel in ws[o + 2]:
@@ -98,7 +159,7 @@ def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]], titulo: str = "", per
                 ws.cell(linha, 1, _paragrafos(nota)).alignment = Alignment(horizontal="center", vertical="top", wrap_text=True)
                 ws.row_dimensions[linha].height = 15 * (_paragrafos(nota).count("\n") + 1)
             ws.freeze_panes = f"B{o + 2}"
-    return buf.getvalue()
+    return _injetar_sparklines(buf.getvalue(), sparks) if sparks else buf.getvalue()
 
 
 ABA_BASE_TRATADA = "已处理数据 Base tratada"

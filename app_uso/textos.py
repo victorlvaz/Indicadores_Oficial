@@ -94,8 +94,10 @@ DIAG = {
     "sem_data": bi("无计划到达日期", "Sem data de chegada planejada"),
     "status": bi("剔除：状态非已完成/在途", "Removidas: status fora de Concluído/Em Trânsito"),
     "mesmo_sc": bi("剔除：同场线路", "Removidas: rota do mesmo SC"),
+    "pedido_mae": bi("剔除：主单数量为空、0 或 1", "Removidas: pedido mãe vazio, 0 ou 1"),
     "tipo_preenchido": bi("承运商类型空白，已按上次报表补全", "Transportador vazio preenchido com o último relatório"),
     "tipo_vazio": bi("承运商类型仍为空（保留）", "Transportador ainda vazio (mantidas)"),
+    "ponto_coleta": bi("剔除：揽收业务网点的集货（客户场地）", "Removidas: coleta em ponto de coleta (base do cliente)"),
     "franqueado": bi("剔除：加盟商承运商", "Removidas: transportador Franqueado"),
     "usadas": bi("使用行数", "Linhas usadas"),
 }

@@ -4,6 +4,10 @@ Secrets (local: .streamlit/secrets.toml · Cloud: Settings > Secrets):
     [login]
     usuario = "..."
     senha = "..."
+
+Para rodar SEM login no computador, no secrets.toml LOCAL (nunca no Cloud):
+    [login]
+    ativo = false
 """
 import base64
 import hmac
@@ -16,6 +20,13 @@ from comum.logo import ARQUIVO, COR_CLARO, COR_ESCURO, PROPORCAO
 
 CHAVE = "logado"
 LARGURA_LOGO = 300
+
+
+def _desativado() -> bool:
+    try:
+        return st.secrets["login"].get("ativo", True) is False
+    except Exception:
+        return False
 
 
 def _credenciais() -> tuple[str, str] | None:
@@ -46,7 +57,7 @@ def _logo_centro() -> str:
 
 def exigir_login() -> None:
     """Mostra a tela de login e PARA a execução enquanto a pessoa não entrar."""
-    if st.session_state.get(CHAVE):
+    if st.session_state.get(CHAVE) or _desativado():
         return
     cred = _credenciais()
     st.html(_logo_centro())
@@ -72,6 +83,8 @@ def exigir_login() -> None:
 
 
 def botao_sair() -> None:
+    if _desativado():
+        return
     if st.sidebar.button(bi("退出", "Sair"), key="login_sair", icon=":material/logout:"):
         st.session_state.pop(CHAVE, None)
         st.rerun()

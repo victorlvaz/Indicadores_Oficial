@@ -74,7 +74,6 @@ def _secao(base, tipo, evento, regional, freq, ini, fim, export):
         st.dataframe(estilizada, width="stretch", hide_index=True, height=min((len(cru) + 1) * 35 + 3, 420))
     exp = cru.copy()
     exp[tx.COL_VAR] = exp[tx.COL_VAR] * 100
-    export[tx.aba_excel_resumo(tipo, evento)] = (exp, {"taxa": rot["taxa"], "meta": "目标 Meta", "pp_extra": [tx.COL_VAR]})
 
 
 def _botoes(base: pd.DataFrame, freq: str, ini, fim):

@@ -23,8 +23,12 @@ ENVIANDO = "Enviando…"
 ENVIADO = frase("已发送到飞书群。", "Mensagem enviada ao grupo.")                              # [revisar]
 ERRO = "Não foi possível enviar: "
 COM_SAUDACAO = "Incluir saudação (Bom dia / Boa tarde / Boa noite) / 包含问候语"                  # [revisar]
+COM_BASE = "Incluir a base no Excel (desmarque se o arquivo estiver grande demais) / Excel 中包含数据底表（文件过大时请取消勾选）"      # [revisar]
 COM_EXCEL = "Enviar também o Excel exportado (em uma 2ª mensagem) / 同时发送导出的 Excel（第二条消息）"      # [revisar]
 COMENTARIO = "Comentário (opcional, entra na mensagem; uma frase por linha) / 备注（可选）"        # [revisar]
+
+
+CAPTURA = None          # lista: quando não é None, botao() só registra os parâmetros (usado pela página "Envio geral")
 
 
 def _agora_brasil() -> datetime:
@@ -109,6 +113,24 @@ def _texto_previa(linha) -> str:
     return "".join(um(p) for p in linha)
 
 
+DESTINO = bi("发送到", "Enviar para")                                                              # [revisar]
+DESTINO_NOME = {"teste": bi("测试群", "Grupo de TESTE"), "oficial": bi("正式群", "Grupo OFICIAL")}   # [revisar]
+DESTINO_CONFIRMA = bi("我确认发送到正式群", "Confirmo o envio para o grupo OFICIAL")              # [revisar]
+
+
+def escolher_destino(cfg: dict, chave: str):
+    """Mostra o seletor Teste/Oficial (se os dois existirem nos Secrets). Devolve (cfg apontando para o grupo, liberado).
+    O padrão é o TESTE; para o oficial é preciso marcar a confirmação."""
+    opcoes = feishu.destinos(cfg)
+    if len(opcoes) == 1:                                            # só um grupo configurado: comportamento antigo
+        return feishu.com_destino(cfg, opcoes[0]), True
+    destino = st.radio(DESTINO, opcoes, horizontal=True, key=f"{chave}_destino", format_func=DESTINO_NOME.get)
+    liberado = True
+    if destino == "oficial":
+        liberado = st.checkbox(DESTINO_CONFIRMA, key=f"{chave}_destino_ok")
+    return feishu.com_destino(cfg, destino), liberado
+
+
 @st.dialog(BOTAO, width="large")
 def _dialogo(chave: str, parametros: dict, nome_xl: str, excel):
     cfg = feishu.configuracao(st.secrets)
@@ -127,7 +149,10 @@ def _dialogo(chave: str, parametros: dict, nome_xl: str, excel):
     senha_ok = True
     if str(cfg.get("senha", "")).strip():
         senha_ok = st.text_input(SENHA, type="password", key=f"{chave}_bot_senha") == str(cfg["senha"])
+    cfg, destino_ok = escolher_destino(cfg, chave)
+    senha_ok = senha_ok and destino_ok
     com_excel = st.checkbox(COM_EXCEL, value=True, key=f"{chave}_bot_excel")
+    com_base = st.checkbox(COM_BASE, value=True, key=f"{chave}_bot_base", disabled=not com_excel)
     sinal = (parametros["periodo_xl"], str(parametros["ini"]))
     ja_enviou = st.session_state.get(f"{chave}_bot_enviado") == sinal
     if ja_enviou:
@@ -135,17 +160,34 @@ def _dialogo(chave: str, parametros: dict, nome_xl: str, excel):
     if st.button(CONFIRMAR, type="primary", disabled=ja_enviou or not senha_ok, key=f"{chave}_bot_confirmar"):
         try:
             with st.spinner(ENVIANDO):
-                feishu.enviar_relatorio(cfg, itens, (nome_xl, excel()) if com_excel else None)
+                feishu.enviar_relatorio(cfg, itens, (nome_xl, (excel() if com_base else _sem_base(excel()))) if com_excel else None)
             st.session_state[f"{chave}_bot_enviado"] = sinal
             st.rerun(scope="fragment")
         except Exception as erro:
             st.error(ERRO + str(erro))
 
 
+def _sem_base(dados: bytes) -> bytes:
+    """Tira do Excel as abas de base (a base tratada e a de formato antigo), deixando só os indicadores."""
+    import io
+    import openpyxl
+    wb = openpyxl.load_workbook(io.BytesIO(dados))
+    for ws in list(wb.worksheets):
+        if any(k in ws.title for k in ("已处理数据", "旧格式", "跟踪查询")) and len(wb.worksheets) > 1:
+            wb.remove(ws)
+    saida = io.BytesIO()
+    wb.save(saida)
+    return saida.getvalue()
+
+
 def botao(*, chave: str, ini, fim, dias: pd.Series, export: dict, titulo: str, periodo_xl: str,
           nome_xl: str, excel, abertura: tuple, blocos: list) -> None:
     """Coloca o botão na barra lateral (use logo abaixo do botão de exportar).
     excel = função sem argumentos que devolve os bytes do .xlsx exportado."""
+    if CAPTURA is not None:                                         # modo "Envio geral": guarda em vez de desenhar o botão
+        CAPTURA.append(dict(chave=chave, ini=ini, fim=fim, dias=dias, export=export, titulo=titulo, periodo_xl=periodo_xl,
+                            abertura=abertura, blocos=blocos, nome_xl=nome_xl, excel=excel))
+        return
     if st.sidebar.button(BOTAO, key=f"{chave}_bot_abrir", help=AJUDA, width="stretch"):
         st.session_state.pop(f"{chave}_bot_enviado", None)            # abrir de novo permite um novo envio
         _dialogo(chave, dict(ini=ini, fim=fim, dias=dias, export=export, titulo=titulo, periodo_xl=periodo_xl,

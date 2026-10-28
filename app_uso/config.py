@@ -24,6 +24,10 @@ COL = {
 # Regionais da planilha do Lucas (todas entram no total). Qualquer regional nova que apareça nos dados é incluída.
 REGIOES = ["GP", "SPS", "RJ", "SPN", "BA", "MG", "CE", "SPE", "PR", "SR"]
 
+# Pedido mãe (mesma coluna do Lacre/Deslacre): vazio, 0 e 1 são excluídos (regra confirmada com a gestora em 27/10)
+PEDIDO_MAE_NOMES = ['Número de " Pedido mãe"', 'Número de "Pedido mãe"', "Número de Pedido mãe"]
+PEDIDO_MAE_MINIMO = 2
+
 # Regras (passo a passo "Relatorio Taxa de Uso do APP.docx"):
 STATUS_VALIDOS = ("Concluído", "Em Trânsito")       # só concluído e em trânsito
 TRANSPORTADOR_EXCLUIDO = "Franqueado"               # prefixo, ex.: "Franqueado-加盟商"

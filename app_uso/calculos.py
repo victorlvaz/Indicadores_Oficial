@@ -4,9 +4,11 @@ Taxa = (check-outs feitos + check-ins feitos) / (viagens x 2).  Coleta agrupa pe
 Entrega pela regional de CHEGADA; o dia é o da chegada planejada (igual à planilha do Lucas)."""
 import pandas as pd
 
+from comum import original
+
 from comum import periodos
 from . import textos as tx
-from .config import COL, INDICADORES, META, ORDEM_TENDENCIA, PREVISTO_POR_VIAGEM, REGIOES, STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO, APOIO
+from .config import COL, INDICADORES, PEDIDO_MAE_MINIMO, PEDIDO_MAE_NOMES, META, ORDEM_TENDENCIA, PREVISTO_POR_VIAGEM, REGIOES, STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO, APOIO
 
 TOTAL = "合计 Total"
 
@@ -17,15 +19,16 @@ def ler_relatorio(origem, sheet_name=0) -> pd.DataFrame:
     precisa = set(COL.values())
     uso = lambda nome: str(nome).strip() in precisa or nome in precisa
     try:
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl")
     except Exception:
         if hasattr(origem, "seek"):
             origem.seek(0)
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd")
 
 
 def carregar_apoio() -> dict:
-    return {"rotas_mesmo_sc": set(pd.read_csv(APOIO / "rotas_mesmo_sc.csv")["rota"].astype(str).str.strip())}
+    return {"rotas_mesmo_sc": set(pd.read_csv(APOIO / "rotas_mesmo_sc.csv")["rota"].astype(str).str.strip()),
+            "pontos_coleta": set(pd.read_csv(APOIO / "pontos_coleta.csv")["estacao"].astype(str).str.strip())}
 
 
 def _preenchido(s: pd.Series) -> pd.Series:
@@ -50,15 +53,20 @@ def tipos_do_arquivo(df: pd.DataFrame) -> dict:
 
 # ---------- tratamento ----------
 def preparar(df: pd.DataFrame, apoio: dict | None = None, tipos_conhecidos: dict | None = None, *,
-             filtro_status=True, filtro_mesmo_sc=True, filtro_franqueado=True):
+             filtro_status=True, filtro_mesmo_sc=True, filtro_franqueado=True, filtro_pedido_mae=True,
+             filtro_ponto_coleta=True):
     """Retorna (base tratada, diagnóstico). `tipos_conhecidos` = {viagem: tipo} do último relatório."""
     apoio = apoio or carregar_apoio()
     faltando = [nome for nome in COL.values() if nome not in df.columns and nome != COL["condutor"]]
     if faltando:
         raise ValueError(tx.ERRO_COLUNAS + ", ".join(faltando))
 
+    col_pm = next((n for n in PEDIDO_MAE_NOMES if n in df.columns), None)
+    if filtro_pedido_mae and col_pm is None:
+        raise ValueError(tx.ERRO_COLUNAS + PEDIDO_MAE_NOMES[0])
     inverso = {nome: chave for chave, nome in COL.items()}
     b = df.reindex(columns=list(COL.values())).rename(columns=inverso).copy()
+    b["pedido_mae"] = pd.to_numeric(df[col_pm], errors="coerce").reindex(b.index) if col_pm else float("nan")
     b = b[b["id"].astype(str).str.strip().ne("任务单号")]            # linha de cabeçalho em chinês, se existir
 
     for c in ("status", "viagem", "partida", "reg_saida", "reg_chegada"):
@@ -84,6 +92,15 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, tipos_conhecidos: dict
         sc = b["viagem"].isin(apoio["rotas_mesmo_sc"])
         diag[tx.DIAG["mesmo_sc"]] = int(sc.sum())
         b = b[~sc]
+    if filtro_ponto_coleta:                                       # ponto de coleta = base do cliente: sai da Coleta
+        fora = (b["tipo_linha"] == "COLETA") & b["partida"].isin(apoio["pontos_coleta"])
+        diag[tx.DIAG["ponto_coleta"]] = int(fora.sum())
+        b = b[~fora]
+
+    if filtro_pedido_mae:
+        ruim = b["pedido_mae"].isna() | (b["pedido_mae"] < PEDIDO_MAE_MINIMO)
+        diag[tx.DIAG["pedido_mae"]] = int(ruim.sum())
+        b = b[~ruim]
 
     vazio = b["tipo_transportador"].isna()                        # transportador vazio: vale o do último relatório
     if vazio.any() and tipos_conhecidos:
@@ -96,7 +113,9 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, tipos_conhecidos: dict
         diag[tx.DIAG["franqueado"]] = int(fr.sum())
         b = b[~fr]
 
+    b = b.drop(columns=["pedido_mae"])
     diag[tx.DIAG["usadas"]] = len(b)
+    b = original.anexar(b, df)                          # linha original do JMS (todas as colunas) para a base exportada
     return b.reset_index(drop=True), diag
 
 

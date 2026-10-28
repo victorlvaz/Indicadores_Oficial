@@ -8,9 +8,11 @@ Entrega pela regional de CHEGADA (igual às planilhas).  A linha de total é a M
 como na planilha; a taxa de cada regional é ponderada pelo número de trechos."""
 import pandas as pd
 
+from comum import original
+
 from comum import periodos
 from . import textos as tx
-from .config import COL, IND, INICIO_DIA_HORAS, META, ORDEM_TENDENCIA, REGIOES, STATUS_VALIDOS, TIPOS
+from .config import APOIO, COL, IND, PEDIDO_MAE_MINIMO, PEDIDO_MAE_NOMES, TRANSPORTADOR_EXCLUIDO, INICIO_DIA_HORAS, META, ORDEM_TENDENCIA, REGIOES, STATUS_VALIDOS, TIPOS
 
 TOTAL = "合计 Total"
 
@@ -21,11 +23,11 @@ def ler_relatorio(origem, sheet_name=0) -> pd.DataFrame:
     precisa = set(COL.values())
     uso = lambda nome: str(nome).strip() in precisa or nome in precisa
     try:
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl")
     except Exception:
         if hasattr(origem, "seek"):
             origem.seek(0)
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd")
 
 
 # ---------- tratamento ----------
@@ -33,17 +35,32 @@ def _chave(b: pd.DataFrame) -> pd.DataFrame:
     return b[["id", "cod_partida", "cod_chegada", "saida_plan"]]
 
 
-def preparar(df: pd.DataFrame):
-    """Retorna (base tratada, diagnóstico, chaves dos trechos descartados por status)."""
+def carregar_apoio() -> dict:
+    return {"rotas_mesmo_sc": set(pd.read_csv(APOIO / "rotas_mesmo_sc.csv")["rota"].astype(str).str.strip()),
+            "pontos_coleta": set(pd.read_csv(APOIO / "pontos_coleta.csv")["estacao"].astype(str).str.strip())}
+
+
+def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_mesmo_sc=True, filtro_franqueado=True,
+             filtro_pedido_mae=True, filtro_ponto_coleta=True, original_df: pd.DataFrame | None = None):
+    """Retorna (base tratada, diagnóstico, chaves dos trechos descartados por regra).
+    Regras iguais às dos outros relatórios JMS: status, Franqueado, pedido mãe vazio/0/1 e rota do mesmo SC."""
+    apoio = apoio or carregar_apoio()
+    col_pm = next((n for n in PEDIDO_MAE_NOMES if n in df.columns), None)
+    if filtro_pedido_mae and col_pm is None:
+        raise ValueError(tx.ERRO_COLUNAS + PEDIDO_MAE_NOMES[0])
     faltando = [nome for nome in COL.values() if nome not in df.columns]
     if faltando:
         raise ValueError(tx.ERRO_COLUNAS + ", ".join(faltando))
 
     inverso = {nome: chave for chave, nome in COL.items()}
     b = df[list(COL.values())].rename(columns=inverso).copy()
+    b["pedido_mae"] = pd.to_numeric(df[col_pm], errors="coerce").reindex(b.index) if col_pm else float("nan")
     b = b[b["id"].astype(str).str.strip().ne("任务单号")]            # cabeçalho em chinês, se existir
+    b["_dia_ref"] = pd.to_datetime(df["__dia_ref"].reindex(b.index), errors="coerce") if "__dia_ref" in df.columns else pd.NaT
+    b["_sa"] = (df["__sem_apoio"].reindex(b.index).fillna(False).astype(bool) if "__sem_apoio" in df.columns
+                else pd.Series(False, index=b.index))                # extract novo: trecho que não está no consolidado de apoio
 
-    for c in ("id", "status", "viagem", "partida", "chegada", "reg_saida", "reg_chegada", "cod_partida", "cod_chegada"):
+    for c in ("id", "status", "viagem", "partida", "chegada", "reg_saida", "reg_chegada", "cod_partida", "cod_chegada", "tipo_transportador"):
         b[c] = b[c].astype("string").str.strip()
     b["cod_partida"] = b["cod_partida"].str.replace(r"\.0$", "", regex=True)
     b["cod_chegada"] = b["cod_chegada"].str.replace(r"\.0$", "", regex=True)
@@ -56,10 +73,26 @@ def preparar(df: pd.DataFrame):
     diag[tx.DIAG["sem_data"]] = int(sem.sum())
     b = b[~sem]
 
-    valido = b["status"].str.startswith(STATUS_VALIDOS).fillna(False)
+    valido = b["status"].str.startswith(STATUS_VALIDOS).fillna(False) | b["_sa"]
     diag[tx.DIAG["status"]] = int((~valido).sum())
     descartadas = _chave(b[~valido]).copy()
     b = b[valido].copy()
+
+    # regras comuns (as linhas removidas entram em `descartadas` para sair do histórico ao salvar)
+    regras = []
+    if filtro_mesmo_sc:
+        regras.append(("mesmo_sc", b["viagem"].isin(apoio["rotas_mesmo_sc"])))
+    if filtro_ponto_coleta:        # ponto de coleta = base do cliente: sai da Coleta
+        regras.append(("ponto_coleta", (b["tipo_linha"] == "COLETA") & b["partida"].isin(apoio["pontos_coleta"])))
+    if filtro_franqueado:
+        regras.append(("franqueado", b["tipo_transportador"].fillna("").str.startswith(TRANSPORTADOR_EXCLUIDO) & ~b["_sa"]))
+    if filtro_pedido_mae:
+        regras.append(("pedido_mae", (b["pedido_mae"].isna() | (b["pedido_mae"] < PEDIDO_MAE_MINIMO)) & ~b["_sa"]))
+    for nome, cond in regras:
+        cond = cond.reindex(b.index).fillna(False)
+        diag[tx.DIAG[nome]] = int(cond.sum())
+        descartadas = pd.concat([descartadas, _chave(b[cond])], ignore_index=True)
+        b = b[~cond].copy()
 
     antes = len(b)
     b = b.drop_duplicates(subset=["id", "cod_partida", "cod_chegada", "saida_plan"], keep="last")
@@ -68,10 +101,70 @@ def preparar(df: pd.DataFrame):
     # momento da extração = o último horário real do arquivo; o que ainda não venceu não é atraso
     momento = pd.concat([b["saida_real"], b["chegada_real"]]).max()
     b = calcular(b, momento)
+    if b["_dia_ref"].notna().any():                    # extract novo: a coluna Data manda no dia (Chegada e Saída)
+        b["dia_chegada"] = b["_dia_ref"].fillna(b["dia_chegada"])
+        b["dia_saida"] = b["_dia_ref"].fillna(b["dia_saida"])
     diag[tx.DIAG["futuro_chegada"]] = int(b["aberto_chegada"].sum())
     diag[tx.DIAG["futuro_saida"]] = int(b["aberto_saida"].sum())
+    if b["_sa"].any():
+        diag[tx.DIAG["sem_apoio"]] = int(b["_sa"].sum())
     diag[tx.DIAG["usadas"]] = len(b)
+    b = b.drop(columns=["pedido_mae", "_sa", "_dia_ref"])
+    b = original.anexar(b, df if original_df is None else original_df)    # linha original (no extract novo: com as colunas de apoio)                          # linha original do JMS (todas as colunas) para a base exportada
     return b.reset_index(drop=True), diag, descartadas
+
+
+# ---------- extract novo (sem status, tipo de transportador e pedido mãe) ----------
+COL_EXTRACT = {
+    "id": ("Número do ID",), "viagem": ("Nome da viagem",), "tipo_linha": ("Tipo de linha",),
+    "cod_partida": ("Código de estação de partida",), "partida": ("Nome de estação de partida",),
+    "reg_saida": ("Nome regional partida",), "cod_chegada": ("Código de estação de chegada",),
+    "chegada": ("Nome de estação de chegada",), "reg_chegada": ("Nome regional chegada",),
+    "saida_plan": ("Hora de partida planejada", "Horario de Saída planejada"),
+    "saida_real": ("Horário real de saída",), "chegada_plan": ("Previsão de chegada",),
+    "chegada_real": ("Tempo real de chegada",),
+}
+
+
+def eh_extract(df: pd.DataFrame) -> bool:
+    """Extract novo do JMS: tem "Previsão de chegada" e "Pontual na chegada", mas não o Status do consolidado."""
+    return {"Previsão de chegada", "Pontual na chegada"} <= set(df.columns) and COL["status"] not in df.columns
+
+
+def _cod(s: pd.Series) -> pd.Series:
+    return s.astype("string").str.strip().str.replace(r"\.0$", "", regex=True)
+
+
+def preparar_extract(df: pd.DataFrame, apoio_df: pd.DataFrame | None, apoio: dict | None = None, **regras):
+    """Mesmo resultado de `preparar`, a partir do extract novo. O consolidado (apoio_df) só serve para achar, por
+    ID + estação de chegada, o Status, o Tipo de transportador e o Pedido mãe; os números vêm do extract.
+    Trecho que não está no consolidado é mantido (e contado no diagnóstico)."""
+    if apoio_df is None or apoio_df.empty:
+        raise ValueError(tx.ERRO_SEM_APOIO)
+    col_pm = next((n for n in PEDIDO_MAE_NOMES if n in apoio_df.columns), None)
+    falta = [COL[k] for k in ("id", "cod_chegada", "status", "tipo_transportador") if COL[k] not in apoio_df.columns]
+    if col_pm is None or falta:
+        raise ValueError(tx.ERRO_COLUNAS_APOIO + ", ".join(falta + ([PEDIDO_MAE_NOMES[0]] if col_pm is None else [])))
+    ps = pd.DataFrame(index=df.index)
+    for chave, nomes in COL_EXTRACT.items():
+        nome = next((n for n in nomes if n in df.columns), None)
+        if nome is None:
+            raise ValueError(tx.ERRO_COLUNAS + nomes[0])
+        ps[COL[chave]] = df[nome]
+    ap = pd.DataFrame({"_id": _cod(apoio_df[COL["id"]]), "_cod": _cod(apoio_df[COL["cod_chegada"]]),
+                       COL["status"]: apoio_df[COL["status"]].values, COL["tipo_transportador"]: apoio_df[COL["tipo_transportador"]].values,
+                       PEDIDO_MAE_NOMES[0]: apoio_df[col_pm].values}).drop_duplicates(["_id", "_cod"], keep="last")
+    chave = pd.DataFrame({"_id": _cod(ps[COL["id"]]), "_cod": _cod(ps[COL["cod_chegada"]])}, index=ps.index)
+    m = chave.merge(ap, on=["_id", "_cod"], how="left", indicator=True)
+    m.index = ps.index
+    for c in (COL["status"], COL["tipo_transportador"], PEDIDO_MAE_NOMES[0]):
+        ps[c] = m[c]
+    ps["__sem_apoio"] = m["_merge"].ne("both")
+    if "Data" in df.columns:        # a 1ª coluna do extract (Data) é o dia da operação: vale para Chegada e Saída
+        ps["__dia_ref"] = pd.to_datetime(df["Data"], errors="coerce").dt.normalize()
+    raw = df.copy()                       # base exportada = idêntica ao "Exportação de detalhes" (sem colunas a mais)
+    b, diag, descartadas = preparar(ps, apoio, original_df=raw, **regras)
+    return b, diag, descartadas
 
 
 def calcular(b: pd.DataFrame, momento) -> pd.DataFrame:

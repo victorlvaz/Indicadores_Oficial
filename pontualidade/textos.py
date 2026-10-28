@@ -103,10 +103,19 @@ def arquivo_excel(ind: str, sufixo: str) -> str:
     return f"支线{IND_ZH[ind]}准点率_Taxa_de_{IND_PT[ind]}_{sufixo}.xlsx"
 
 
+ERRO_SEM_APOIO = ("O extract novo não traz Franqueado nem pedido mãe: envie junto o relatório consolidado (usado só como apoio "
+                  "para remover esses trechos).")
+ERRO_COLUNAS_APOIO = "O consolidado de apoio não tem as colunas: "
+
 DIAG = {
     "lidas": bi("读取行数", "Linhas lidas"),
     "sem_data": bi("无计划时间", "Sem horário planejado"),
     "status": bi("剔除：状态非已完成/在途", "Removidos: status fora de Concluído/Em Trânsito"),
+    "mesmo_sc": bi("剔除：同场线路", "Removidos: rota do mesmo SC"),
+    "ponto_coleta": bi("剔除：揽收业务网点的集货（客户场地）", "Removidos: coleta em ponto de coleta (base do cliente)"),
+    "franqueado": bi("剔除：加盟商承运商", "Removidos: transportador Franqueado"),
+    "pedido_mae": bi("剔除：母单号为空、0或1", "Removidos: pedido mãe vazio, 0 ou 1"),
+    "sem_apoio": bi("提示：不在汇总报表中的行（已保留）", "Aviso: trechos que não estão no consolidado de apoio (mantidos)"),
     "duplicadas": bi("剔除：重复行", "Removidos: trechos duplicados"),
     "futuro_chegada": bi("到达尚未到期（不计入）", "Chegadas ainda dentro do prazo (fora do cálculo)"),     # [revisar]
     "futuro_saida": bi("发车尚未到期（不计入）", "Saídas ainda dentro do prazo (fora do cálculo)"),         # [revisar]

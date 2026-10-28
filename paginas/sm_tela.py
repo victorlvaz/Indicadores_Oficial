@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from comum import banco, feishu_envio, periodos, resumo_dia
+from comum import original
 from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.estilos import estilizar_tendencia, pct, pp
 from comum.idioma import cabecalho, rodape
@@ -18,7 +19,8 @@ from sm.calculos import (aplicar_techis, base_para_exportar, carregar_apoio, col
                          contagem_techis, df_para_xlsx, embarque_com_espaco, filtrar_techis, juntar, ler_planilha,
                          ler_techis, pendentes, preparar_jms, rotular_tabela, tabela_periodo, techis_ligado,
                          tendencia)
-from sm.config import COL_TECHIS_EMBARQUE, LIMITAR_REALIZADO, REGIOES, TIPOS
+from comum.sql import ids_do_arquivo
+from sm.config import COL_JMS as SM_COL, COL_TECHIS_EMBARQUE, LIMITAR_REALIZADO, REGIOES, TIPOS
 
 cabecalho(*tx.PAGINA)
 
@@ -104,7 +106,7 @@ try:
     eng = banco.engine()
     versao = historico.versao(eng)
 except Exception as erro:                                  # banco fora do ar, senha errada, sem driver...
-    st.error(tx.ERRO_BANCO + str(erro))
+    st.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
     st.stop()
 
 # ---------- Carga: sobe os relatórios e salva no histórico ----------
@@ -132,15 +134,17 @@ if techis is not None:
 
 # JMS enviado e ainda não salvo (as regras do tratamento são fixas, ver sm/config.py)
 apoio = carregar_apoio()
-novas, diags = [], []
+novas, diags, ids_brutos_sm = [], [], {}
 for tipo in TIPOS:
     for arq in up[tipo] or []:
         try:
-            b, d = preparar_jms(_ler_jms(arq.getvalue(), arq.name), tipo, apoio)
+            bruto_sm = _ler_jms(arq.getvalue(), arq.name)
+            b, d = preparar_jms(bruto_sm, tipo, apoio)
         except Exception as erro:                   # arquivo ilegível/errado: avisa e segue com os demais
             st.sidebar.error(f"{tx.TIPO_PT[tipo]} · {arq.name}: {erro}")
             continue
         novas.append(b)
+        ids_brutos_sm.setdefault(tipo, []).extend(ids_do_arquivo(bruto_sm, SM_COL["id"]))
         diags.append({tx.DIAG["arquivo"]: arq.name, **d})
 
 if pendente:
@@ -154,9 +158,9 @@ if pendente:
             try:
                 para_salvar = aplicar_techis(juntar(novas), contagem_techis(techis), limitar=LIMITAR_REALIZADO)
                 nomes = ", ".join(a.name for t in TIPOS for a in up[t] or [])
-                r = historico.salvar(eng, para_salvar, nomes)
+                r = historico.salvar(eng, para_salvar, nomes, ids_brutos=ids_brutos_sm)
             except Exception as erro:
-                st.sidebar.error(tx.ERRO_BANCO + str(erro))
+                st.sidebar.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
             else:
                 for chave in ("sm_coleta", "sm_entrega", "sm_techis"):
                     esvaziar(chave)
@@ -166,7 +170,7 @@ if "sm_msg_salvo" in st.session_state:
     st.sidebar.success(f"{tx.SALVO_OK} — {st.session_state.pop('sm_msg_salvo')}")
 
 # ---------- Base: com arquivo enviado e ainda não salvo, escolhe entre só o enviado ou histórico + enviado ----------
-ver = "hist"
+ver = "env"          # padrão: só o que foi enviado; o operador escolhe somar o histórico (vale para tela e Excel)
 if novas:
     ver = st.sidebar.radio(tx.VER_TITULO, ["env", "hist"], key="sm_ver", help=tx.VER_AJUDA,
                            format_func=lambda v: tx.VER_ENVIADO if v == "env" else tx.VER_HISTORICO)
@@ -279,7 +283,10 @@ with abas[2]:
             st.info(tx.INFO_UM_DIA)
             t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {})
+        if gran == "W" and ini is not None:      # semana: o Excel traz os DIAS da semana escolhida (não S01, S02...)
+            _td = tendencia(base[base["dia"] >= pd.Timestamp(ini)], tipo, "D", fim)
+            t_tab = _td if not _td.empty else t_tab
+        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {"sparkline": True})
 
 with abas[3]:
     if base.empty:
@@ -370,7 +377,8 @@ with abas[6]:
                  hide_index=True, height=400)
     for tipo in TIPOS:
         if (sub["tipo"] == tipo).any():
-            bases_export[tx.aba_excel_base(tipo)] = (base_para_exportar(sub, tipo), {"sem_pct": True})
+            bases_export[tx.aba_excel_base(tipo)] = (base_para_exportar(
+                original.completar_colunas(eng, historico.viagens, ["tipo", "id"], "dia", sub), tipo), {"sem_pct": True})
 
 # ---------- Exportar ----------
 export = {**bases_export, **export}                     # a base já tratada (Coleta, Entrega) vem nas primeiras abas
@@ -388,4 +396,6 @@ feishu_envio.botao(
     abertura=("Segue a estatística de Status dos SMs de Coleta e Entrega do dia {d}.", "以下是{d}支线集货-散货SM状态统计。"),
     blocos=[("img", "SMs **COLETA**:", [tx.aba_excel_tabela("COLETA")]),
             ("img", "SMs **ENTREGA**:", [tx.aba_excel_tabela("ENTREGA")]),
+            ("img", "Tendência na **COLETA**:", [tx.aba_excel_tendencia("COLETA")]),
+            ("img", "Tendência na **ENTREGA**:", [tx.aba_excel_tendencia("ENTREGA")]),
             ("comentario",)])

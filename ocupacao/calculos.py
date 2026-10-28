@@ -5,6 +5,8 @@ A ocupação de cada regional (ou tipo de veículo) é limitada a 100%, como na 
 O dia é o do horário planejado de saída."""
 import pandas as pd
 
+from comum import original
+
 from comum import periodos
 from . import config as cfg, textos as tx
 from .config import CAPACIDADE, COL, COL_OPCIONAIS, INDICADORES, META, PEDIDO_MAE_REMOVER, REGIOES, STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO
@@ -18,15 +20,16 @@ def ler_relatorio(origem, sheet_name=0) -> pd.DataFrame:
     nomes = {n for lst in COL.values() for n in lst}
     uso = lambda nome: str(nome).strip() in nomes
     try:
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl")
     except Exception:
         if hasattr(origem, "seek"):
             origem.seek(0)
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd")
 
 
 def carregar_apoio() -> dict:
-    return {"rotas_mesmo_sc": set(pd.read_csv(cfg.APOIO / "rotas_mesmo_sc.csv")["rota"].astype(str).str.strip())}
+    return {"rotas_mesmo_sc": set(pd.read_csv(cfg.APOIO / "rotas_mesmo_sc.csv")["rota"].astype(str).str.strip()),
+            "pontos_coleta": set(pd.read_csv(cfg.APOIO / "pontos_coleta.csv")["estacao"].astype(str).str.strip())}
 
 
 def _achar_colunas(df: pd.DataFrame) -> dict:
@@ -44,7 +47,7 @@ def _achar_colunas(df: pd.DataFrame) -> dict:
 
 # ---------- tratamento ----------
 def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True, filtro_mesmo_sc=True,
-             filtro_franqueado=True, filtro_pedido_mae=True):
+             filtro_franqueado=True, filtro_pedido_mae=True, filtro_ponto_coleta=True):
     """Retorna (base tratada, diagnóstico). Coleta e Entrega vêm juntas no mesmo arquivo."""
     apoio = apoio or carregar_apoio()
     df = df.copy()
@@ -79,6 +82,10 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
         sc = b["viagem"].isin(apoio["rotas_mesmo_sc"])
         diag[tx.DIAG["mesmo_sc"]] = int(sc.sum())
         b = b[~sc]
+    if filtro_ponto_coleta:                                       # ponto de coleta = base do cliente: sai da Coleta
+        fora = (b["tipo_linha"] == "COLETA") & b["partida"].isin(apoio["pontos_coleta"])
+        diag[tx.DIAG["ponto_coleta"]] = int(fora.sum())
+        b = b[~fora]
     if filtro_franqueado:
         fr = b["tipo_transportador"].str.startswith(TRANSPORTADOR_EXCLUIDO)
         diag[tx.DIAG["franqueado"]] = int(fr.sum())
@@ -94,9 +101,11 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
         diag[tx.DIAG["pedido_mae"]] = int(ruim.sum())
         b = b[~ruim]
 
-    sem_cap = ~b["veiculo"].isin(CAPACIDADE)
+    sem_cap = ~b["veiculo"].isin(CAPACIDADE)               # ex.: Barco: sem capacidade cadastrada -> fora (como na base da Joilma)
     diag[tx.DIAG["sem_capacidade"]] = int(sem_cap.sum())
+    b = b[~sem_cap]
     diag[tx.DIAG["usadas"]] = len(b)
+    b = original.anexar(b, df)                          # linha original do JMS (todas as colunas) para a base exportada
     return b.reset_index(drop=True), diag
 
 

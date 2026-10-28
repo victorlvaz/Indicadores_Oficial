@@ -9,10 +9,12 @@ já estava gravado e o do TECHIS novo (o TECHIS novo pode não cobrir dias antig
 from datetime import datetime
 
 import pandas as pd
+
+from comum import original
 from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, and_,
                         bindparam, delete, func, inspect, select)
 
-from comum.sql import apagar_por_chaves  # noqa: E402
+from comum.sql import apagar_por_chaves, com_reconexao  # noqa: E402
 
 meta = MetaData()
 
@@ -39,6 +41,7 @@ viagens = Table(
     Column("sm_contagem", Integer, nullable=False),
     Column("carregado_em", DateTime, nullable=False),
     Column("arquivo", String(250)),
+    Column("original", Text),                       # linha original do JMS (compactada), para a base exportada
     Index("ix_sm_viagens_dia", "dia"),
 )
 
@@ -56,20 +59,22 @@ cargas = Table(
 )
 
 CHAVE = ["tipo", "id"]
-_COLUNAS = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo")]
+_COLUNAS = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo", "original")]
 _TEXTOS = ["status", "viagem", "rota", "rota_usada", "tipo_transportador", "condutor", "transportador", "partida", "chegada",
            "placa", "regiao", "regiao_destino"]
 
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)
+    original.garantir_coluna(engine, viagens)
     colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
     if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
         with engine.begin() as con:
             con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN condutor VARCHAR(120)")
 
 
-def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "") -> dict:
+@com_reconexao
+def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "", ids_brutos=None) -> dict:
     """Grava a base (já com sm_contagem, vinda de aplicar_techis). Retorna {"novas", "atualizadas", "linhas"}."""
     preparar_tabelas(engine)
     agora = datetime.now().replace(microsecond=0)
@@ -79,7 +84,13 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "") -> di
     df["dia"] = df["saida_plan"].dt.normalize().dt.date
     for c in _TEXTOS:
         df[c] = df[c].where(df[c].notna(), None).map(lambda v: None if v is None else str(v))
-    df = df.drop_duplicates(subset=CHAVE, keep="last")[_COLUNAS].copy()
+    dd = df.drop_duplicates(subset=CHAVE, keep="last")
+    from .calculos import INTERNAS
+    outras = [c for c in dd.columns if c not in INTERNAS + ["sm_contagem", "sm_real", "original"] and dd[c].notna().any()]
+    df = dd[_COLUNAS].copy()
+    if outras:                                    # colunas originais do JMS, para a base exportada sair igual ao arquivo
+        pacotes = pd.Series(original.empacotar(dd[outras]), index=dd.index, dtype=object)
+        df["original"] = pacotes.where(dd[outras].notna().any(axis=1), None)
     df["sm_prev"] = df["sm_prev"].astype(int)
     df["sm_contagem"] = df["sm_contagem"].fillna(0).astype(int)
     if df.empty:
@@ -96,6 +107,10 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, observacao: str = "") -> di
         repetidas = [(t, i) for t, i, a in zip(df["tipo"], df["id"], antes) if pd.notna(a)]
         if repetidas:
             apagar_por_chaves(con, viagens, ["tipo", "id"], repetidas)
+        for tp, ids in (ids_brutos or {}).items():        # reprocessa o arquivo inteiro: some também o que o filtro novo exclui
+            ids = list(ids or [])
+            for i in range(0, len(ids), 400):
+                con.execute(delete(viagens).where(and_(viagens.c.tipo == tp, viagens.c.id.in_(ids[i:i + 400]))))
         df["carregado_em"] = agora
         df["arquivo"] = arquivo[:250]
         registros = df.astype(object).where(df.notna(), None).to_dict("records")

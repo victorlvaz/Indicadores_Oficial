@@ -4,9 +4,12 @@ import io
 import pandas as pd
 import streamlit as st
 
-from comum import banco, feishu_envio, periodos, resumo_dia
+from comum.sql import ids_do_arquivo
+from comum import banco, feishu_envio, periodos, previa, resumo_dia
 from comum.estilos import estilizar_tendencia, pct, pp
-from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
+from comum import original
+from ocupacao.config import COL as COL_JMS
+from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -68,7 +71,7 @@ try:
     eng = banco.engine()
     versao = historico.versao(eng)
 except Exception as erro:
-    st.error(tx.ERRO_BANCO + str(erro))
+    st.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
     st.stop()
 
 # ---------- Carga ----------
@@ -84,11 +87,11 @@ if arquivos:
                 with st.spinner(tx.SALVANDO + arq.name, show_time=True):
                     df = _ler_cache(arq.getvalue())
                     b, d = preparar(df, apoio)
-                    resumos.append((arq.name, historico.salvar(eng, b, arq.name, len(df))))
+                    resumos.append((arq.name, historico.salvar(eng, b, arq.name, len(df), ids_brutos=ids_do_arquivo(df, COL_JMS["id"]))))
         except ValueError as erro:
             st.sidebar.error(str(erro))
         except Exception as erro:
-            st.sidebar.error(tx.ERRO_BANCO + str(erro))
+            st.sidebar.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
         else:
             esvaziar("ocupacao")
             st.session_state["oc_msg_salvo"] = [
@@ -97,11 +100,33 @@ if arquivos:
 for linha in st.session_state.pop("oc_msg_salvo", []):
     st.sidebar.success(f"{tx.SALVO_OK} — {linha}")
 
-if versao[0] == 0:
+@st.cache_data(show_spinner="Tratando os arquivos enviados…", max_entries=3)
+def _pendente(pacote: tuple, ref_versao):
+    """Arquivos enviados e ainda não salvos, tratados pelas mesmas regras do Salvar (banco temporário em memória)."""
+    apoio_p, tmp, ids, erros = carregar_apoio(), previa.engine_memoria(), [], []
+    for nome, conteudo in pacote:
+        try:
+            bruto = _ler_cache(conteudo)
+            b_p, _ = preparar(bruto, apoio_p)
+            historico.salvar(tmp, b_p, nome, len(bruto), ids_brutos=ids_do_arquivo(bruto, COL_JMS["id"]))
+            ids += ids_do_arquivo(bruto, COL_JMS["id"])
+        except Exception as erro:
+            erros.append(f"{nome}: {str(erro).split('[SQL:')[0].strip()[:300]}")
+    return historico.ler(tmp, com_original=True), ids, erros
+
+
+pend, ids_pend = None, []
+if arquivos:
+    pend, ids_pend, erros_pend = _pendente(tuple((a.name, a.getvalue()) for a in arquivos), versao)
+    for e in erros_pend:
+        st.sidebar.error(e)
+    pend = pend if len(pend) else None
+
+if versao[0] == 0 and pend is None:
     st.info(tx.INFO_SEM_ARQUIVO)
     st.stop()
 
-base = _historico(versao)
+base = previa.combinar("oc_ver", _historico(versao) if versao[0] else None, pend, ["id"], ids_pend)   # só o enviado ou histórico + enviado
 if base.empty:
     st.warning(tx.AVISO_BASE_VAZIA)
     st.stop()
@@ -178,7 +203,10 @@ with abas[2]:
             st.info(tx.INFO_UM_DIA)
             t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {})
+        if gran == "W" and ini is not None:      # semana: o Excel traz os DIAS da semana escolhida (não S01, S02...)
+            _td = tendencia(base[base["dia"] >= pd.Timestamp(ini)], tipo, "D", fim)
+            t_tab = _td if not _td.empty else t_tab
+        export[tx.aba_excel_tendencia(tipo)] = (t_tab, {"sparkline": True})
 
 with abas[3]:
     resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
@@ -196,9 +224,9 @@ with abas[4]:
     st.subheader(tx.SUB_BASE)
     sub = base if ini is None else base[(base["dia"] >= ini) & (base["dia"] <= fim)]
     st.caption(f"{len(sub):,}".replace(",", ".") + " linhas · " + per_txt)
-    st.dataframe(sub.head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
+    st.dataframe(sub.drop(columns=["original"], errors="ignore").head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
 
-export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
+export_final = original.base_primeiro(export, eng, historico.viagens, ["id"], "dia", sub, COL_JMS)      # 1ª aba: base idêntica ao JMS
 titulo_xl = titulo_relatorio("paginas/ocupacao_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, base["dia"])
 nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
@@ -213,6 +241,8 @@ feishu_envio.botao(
     blocos=[("linha", "Base de dados: JMS (coleta e entrega)"), ("linha", "数据来源：JMS（集货与散货）"),
             ("img", None, [tx.aba_excel_tabela("COLETA")]),
             ("img", None, [tx.aba_excel_tabela("ENTREGA")]),
+            ("img", [("Tendência ", False), ("COLETA", True), ("/ ", False), ("ENTREGA", True), (":", False)],
+             [tx.aba_excel_tendencia("COLETA"), tx.aba_excel_tendencia("ENTREGA")]),
             ("comentario",),
             ("linha", "Segue abaixo, no detalhe, a volumetria carregada por cada tipo de veículo."),
             ("linha", "以下是按车型统计的装载量明细。"),

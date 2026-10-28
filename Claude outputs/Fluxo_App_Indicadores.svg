@@ -1,0 +1,115 @@
+<svg width="1288" height="528" viewBox="-14 -14 1288 528" role="img" aria-label="O arquivo do JMS, TECHIS ou das planilhas de frete entra pelo upload depois do login, passa pelas regras, vai para o histórico e alimenta os relatórios, que saem na tela, no Excel e no bot do Feishu." xmlns="http://www.w3.org/2000/svg">
+<style>
+text{font-family:"Segoe UI","Calibri","Noto Sans","Microsoft YaHei","Noto Sans CJK SC",Arial,sans-serif}
+.box,.box2{fill:#fff;stroke:#cfcac8;stroke-width:1.2}.lane{fill:#efedec;stroke:#cfcac8;stroke-dasharray:5 4}
+.db{fill:#fbe9ea;stroke:#d40511;stroke-width:1.4}.dbtop{fill:#fff;stroke:#d40511;stroke-width:1.4}
+.t{font-size:14px;font-weight:700;fill:#1f1d1d}.s{font-size:12px;fill:#6b6665}.s2{font-size:13px;fill:#1f1d1d}
+.h{font-size:11px;letter-spacing:1.3px;font-weight:700;fill:#d40511}.zh{font-size:11px;fill:#6b6665}.lb{font-size:11px;fill:#6b6665}
+.ar{stroke:#d40511;stroke-width:1.8;fill:none}.ar2{stroke:#6b6665;stroke-width:1.5;fill:none}
+.ln{stroke:#6b6665;stroke-width:1.5;fill:none}.div{stroke:#cfcac8}
+</style><rect x="-14" y="-14" width="1288" height="528" fill="#ffffff"/><defs><marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#d40511"/></marker></defs>
+<text class="h" x="20" y="26">ENTRADA</text><text class="zh" x="90.19999999999999" y="26">数据源</text>
+<text class="h" x="240" y="26">CARGA</text><text class="zh" x="293.0" y="26">上传</text>
+<text class="h" x="460" y="26">TRATAMENTO</text><text class="zh" x="556.0" y="26">处理</text>
+<text class="h" x="680" y="26">HISTÓRICO</text><text class="zh" x="767.4" y="26">历史库</text>
+<text class="h" x="900" y="26">RELATÓRIOS</text><text class="zh" x="996.0" y="26">报表</text>
+<text class="h" x="1090" y="26">SAÍDAS</text><text class="zh" x="1150" y="26">输出</text>
+<rect class="box" x="20" y="50" width="170" height="74" rx="6"/>
+<text class="t" x="32" y="72">JMS</text>
+<text class="s" x="32" y="92">Viagens secundárias</text>
+<text class="s" x="32" y="109">(.xls / .xlsx)</text>
+<rect class="box" x="20" y="148" width="170" height="74" rx="6"/>
+<text class="t" x="32" y="170">TECHIS</text>
+<text class="s" x="32" y="190">Status dos SMs</text>
+<text class="s" x="32" y="207">(.xlsx)</text>
+<rect class="box" x="20" y="246" width="170" height="74" rx="6"/>
+<text class="t" x="32" y="268">Controladoria</text>
+<text class="s" x="32" y="288">Fretes diários das</text>
+<text class="s" x="32" y="305">regionais (.xlsx)</text>
+<path class="ln" d="M190 87 L215 87"/>
+<path class="ln" d="M190 185 L215 185"/>
+<path class="ln" d="M190 283 L215 283"/>
+<path class="ln" d="M215 87 L215 283"/>
+<rect class="box" x="240" y="50" width="170" height="74" rx="6"/>
+<text class="t" x="252" y="72">Login</text>
+<text class="s" x="252" y="92">Usuário e senha únicos</text>
+<text class="s" x="252" y="109">do time (nos Secrets)</text>
+<rect class="box" x="240" y="148" width="170" height="74" rx="6"/>
+<text class="t" x="252" y="170">Upload do arquivo</text>
+<text class="s" x="252" y="190">na página do relatório</text>
+<text class="s" x="252" y="207">Custos: vários arquivos</text>
+<rect class="box" x="240" y="246" width="170" height="74" rx="6"/>
+<text class="t" x="252" y="268">Salvar no histórico</text>
+<text class="s" x="252" y="288">botão da barra lateral</text>
+<path class="ar" d="M215 185 L240 185" marker-end="url(#ah)"/>
+<path class="ar2" d="M325 124 L325 148" marker-end="url(#ah)"/>
+<path class="ar2" d="M325 222 L325 246" marker-end="url(#ah)"/>
+<rect class="box" x="460" y="176" width="170" height="162" rx="6"/>
+<text class="t" x="472" y="198">Leitura e regras</text>
+<text class="s" x="472" y="218">Só Concluído e Em trânsito</text>
+<text class="s" x="472" y="235">Sem rotas do mesmo SC</text>
+<text class="s" x="472" y="252">Sem Franqueado</text>
+<text class="s" x="472" y="269">Capacidade por veículo</text>
+<text class="s" x="472" y="286">Guarda a linha original</text>
+<text class="s" x="472" y="303">do JMS (todas as colunas)</text>
+<path class="ar" d="M410 283 L460 283" marker-end="url(#ah)"/>
+<text class="lb" x="435" y="273" text-anchor="middle">valida</text>
+<path class="db" d="M680 190 v134 a85.0 14 0 0 0 170 0 v-134 a85.0 14 0 0 0 -170 0 z"/>
+<ellipse class="dbtop" cx="765.0" cy="190" rx="85.0" ry="14"/>
+<text class="t" x="692" y="228">Histórico</text>
+<text class="s" x="692" y="250">Uma linha por viagem</text>
+<text class="s" x="692" y="267">Reenviar o dia atualiza,</text>
+<text class="s" x="692" y="284">sem duplicar</text>
+<text class="s" x="692" y="301">Local: SQLite</text>
+<text class="s" x="692" y="318">Nuvem: PostgreSQL</text>
+<path class="ar" d="M630 283 L680 283" marker-end="url(#ah)"/>
+<text class="lb" x="655" y="273" text-anchor="middle">grava</text>
+<rect class="box" x="900" y="50" width="170" height="330" rx="6"/>
+<text class="t" x="912" y="72">Relatórios</text>
+<text class="s2" x="912" y="100">Lacre / Deslacre</text>
+<text class="s2" x="912" y="122">SM</text>
+<text class="s2" x="912" y="144">Uso de APP</text>
+<text class="s2" x="912" y="166">Pontualidade</text>
+<text class="s2" x="912" y="188">Ocupação</text>
+<text class="s2" x="912" y="210">Desperdício</text>
+<text class="s2" x="912" y="232">Custos</text>
+<text class="s" x="912" y="270">Período: Dia, Semana,</text>
+<text class="s" x="912" y="287">Mês ou Ano</text>
+<text class="s" x="912" y="304">Compara com o período</text>
+<text class="s" x="912" y="321">anterior</text>
+<line class="div" x1="912" x2="1058" y1="248" y2="248"/>
+<path class="ar" d="M850 265 L900 265" marker-end="url(#ah)"/>
+<text class="lb" x="875" y="255" text-anchor="middle">lê</text>
+<rect class="box" x="1090" y="50" width="170" height="92" rx="6"/>
+<text class="t" x="1102" y="72">Tela do Streamlit</text>
+<text class="s" x="1102" y="92">Tabela, tendência,</text>
+<text class="s" x="1102" y="109">resumo e base</text>
+<rect class="box" x="1090" y="166" width="170" height="110" rx="6"/>
+<text class="t" x="1102" y="188">Excel</text>
+<text class="s" x="1102" y="208">1ª aba: base igual ao JMS</text>
+<text class="s" x="1102" y="225">Uma aba por indicador</text>
+<text class="s" x="1102" y="242">Sparkline dos 7 dias</text>
+<rect class="box" x="1090" y="300" width="170" height="80" rx="6"/>
+<text class="t" x="1102" y="322">Bot do Feishu</text>
+<text class="s" x="1102" y="342">Imagens + Excel no grupo</text>
+<text class="s" x="1102" y="359">Custos cita os líderes</text>
+<path class="ln" d="M1070 265 L1080 265"/>
+<path class="ln" d="M1080 96 L1080 340"/>
+<path class="ar" d="M1080 96 L1090 96" marker-end="url(#ah)"/>
+<path class="ar" d="M1080 221 L1090 221" marker-end="url(#ah)"/>
+<path class="ar" d="M1080 340 L1090 340" marker-end="url(#ah)"/>
+<line class="ln" x1="1070" x2="1080" y1="265" y2="265"/>
+<rect class="lane" x="20" y="410" width="1240" height="76" rx="6"/>
+<text class="h" x="36" y="432">PUBLICAÇÃO</text><text class="zh" x="132" y="432">发布</text>
+<rect class="box2" x="36" y="442" width="230" height="34" rx="6"/>
+<text class="t" x="48" y="464"></text>
+<text class="s2" x="48" y="464">Código no GitHub (Desktop)</text>
+<path class="ar" d="M266 459 L310 459" marker-end="url(#ah)"/>
+<rect class="box2" x="310" y="442" width="230" height="34" rx="6"/>
+<text class="t" x="322" y="464"></text>
+<text class="s2" x="322" y="464">Streamlit Community Cloud</text>
+<path class="ar" d="M540 459 L584 459" marker-end="url(#ah)"/>
+<rect class="box2" x="584" y="442" width="230" height="34" rx="6"/>
+<text class="t" x="596" y="464"></text>
+<text class="s2" x="596" y="464">Time acessa pelo link + login</text>
+<text class="s" x="840" y="456">Senhas, banco e Feishu ficam nos Secrets</text><text class="s" x="840" y="473">do Cloud, nunca no GitHub.</text></svg>

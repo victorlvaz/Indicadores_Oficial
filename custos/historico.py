@@ -5,6 +5,8 @@ diferentes). Reenviar o arquivo de uma regional substitui os dias que ele cobre,
 from datetime import datetime
 
 import pandas as pd
+
+from comum.sql import com_reconexao
 from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, and_, delete, func,
                         select)
 
@@ -68,6 +70,7 @@ def _lotes(seq, n=500):
         yield seq[i:i + n]
 
 
+@com_reconexao
 def salvar(engine, base: pd.DataFrame, regional: str, arquivo: str, linhas_lidas: int, observacao: str = "") -> dict:
     """Grava a base de UMA regional. Substitui o que já existia dessa regional entre a 1ª e a última data do arquivo."""
     preparar_tabelas(engine)

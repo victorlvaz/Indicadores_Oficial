@@ -61,6 +61,16 @@ RELATORIOS = [
     },
     {
         "grupo": bi("支线", "Linha secundária"),
+        "titulo": bi("浪费率", "Taxa de Desperdício"),
+        "arquivo": "paginas/desperdicio_tela.py",
+        "url": "desperdicio",
+        "icone": ":material/trending_down:",
+        "descricao": frase("按区域和车型统计装载浪费（未被占用的运力，集货与散货），含趋势与汇总。",
+                           "Desperdício de capacidade (o que não foi ocupado) por regional e tipo de veículo "
+                           "(Coleta e Entrega), tendência e exportação. Usa a mesma base da Taxa de Ocupação."),
+    },
+    {
+        "grupo": bi("支线", "Linha secundária"),
         "titulo": bi("物流成本指标", "Indicadores de Custos"),
         "arquivo": "paginas/custos_tela.py",
         "url": "custos",
@@ -77,5 +87,15 @@ RELATORIOS = [
         "icone": ":material/group:",
         "descricao": frase("登记各区域负责人，用于成本催办消息中的 @ 提醒。",
                            "Cadastro dos líderes de cada regional, usado na cobrança e nas menções do Feishu."),
+    },
+    {
+        "grupo": bi("设置", "Cadastros"),
+        "titulo": bi("发送汇总", "Envio geral"),
+        "arquivo": "paginas/envio_geral_tela.py",
+        "url": "envio-geral",
+        "icone": ":material/send:",
+        "descricao": frase("一次性把所有 JMS 指标依次发送到飞书（指标、文件），可选日/周/月/年。",
+                           "Envia ao Feishu todos os indicadores com JMS, um por vez (indicador e arquivo), "
+                           "com prévia e período Dia/Semana/Mês/Ano."),
     },
 ]

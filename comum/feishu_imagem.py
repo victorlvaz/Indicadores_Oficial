@@ -130,6 +130,7 @@ def _formatador(df: pd.DataFrame, cols: dict):
         return _formatador_custos(df, cols)
     pct_cols = {cols.get("taxa"), cols.get("meta"), *cols.get("pct_extra", ())} - {None}
     pp_cols = set(cols.get("pp_extra", ()))
+    reais_cols = set(cols.get("reais", ()))
     sem_meta = not cols
 
     def eh_taxa(c) -> bool:
@@ -142,6 +143,8 @@ def _formatador(df: pd.DataFrame, cols: dict):
     def fmt(c, j, v):
         if c in pp_cols:
             return _pp(v)
+        if c in reais_cols:
+            return "" if pd.isna(v) else "R$ " + _milhar(v, 2)
         if c in pct_cols:
             return _pct(v)
         if isinstance(v, (pd.Timestamp,)) or hasattr(v, "strftime"):
@@ -160,6 +163,31 @@ def _formatador(df: pd.DataFrame, cols: dict):
     return fmt
 
 
+SPARK_AZUL = (55, 96, 146)                 # 376092, Estilo de Mini Gráfico Escuro #5
+SPARK_PONTO = (208, 0, 0)                  # D00000
+COL_SPARK = "近七天趋势 Tendência 7 dias"
+
+
+def _sparkline(d, caixa, valores, s: int):
+    """Mini gráfico de linha (vermelho, com o último ponto marcado) dentro da célula."""
+    x0, y0, x1, y1 = caixa
+    pts = [(k, v) for k, v in enumerate(valores) if v == v]
+    if len(pts) < 2:
+        return
+    lo, hi = min(v for _, v in pts), max(v for _, v in pts)
+    mx, my = 10 * s, 5 * s
+    n = len(valores) - 1
+
+    def xy(k, v):
+        y = (y0 + y1) / 2 if hi == lo else y1 - my - (v - lo) / (hi - lo) * (y1 - y0 - 2 * my)
+        return (x0 + mx + k / n * (x1 - x0 - 2 * mx), y)
+    xs = [xy(k, v) for k, v in pts]
+    d.line(xs, fill=SPARK_AZUL, width=max(2, s))
+    r = int(1.6 * s)
+    for ux, uy in xs:                                           # um ponto em cada período, como no estilo Escuro #5
+        d.ellipse([ux - r, uy - r, ux + r, uy + r], fill=SPARK_PONTO)
+
+
 def _cabecalho_2_linhas(nome: str) -> tuple[str, str]:
     """"发车区域 Região Saída" -> ("发车区域", "Região Saída"); "Regional de Origem发出代理区" -> ("发出代理区", "Regional de Origem")."""
     nome = str(nome).strip()
@@ -172,17 +200,27 @@ def _cabecalho_2_linhas(nome: str) -> tuple[str, str]:
 
 def tabela_png(df: pd.DataFrame, titulo: str, cols: dict | None = None, escala: int = 2) -> bytes:
     """Uma tabela como PNG. `cols` = metadados do export ({"taxa":..., "meta":...} ou {}); linhas de total ficam em cinza."""
-    cols = cols or {}
+    quer_spark = bool((cols or {}).get("sparkline"))
+    cols = {k: v for k, v in (cols or {}).items() if k != "sparkline"}
     s = escala
     tam, tam_t = 13 * s, 16 * s
     pad, alt_lin, alt_tit = 7 * s, 23 * s, 34 * s
     df = df.reset_index(drop=True)
     df = df.loc[:, ~df.isna().all()]                              # colunas sem nenhum dado (ex.: comparação de um dia só) ficam de fora
     colunas = list(df.columns)
+    dados_spark = None
+    if quer_spark and len(colunas) >= 4:                           # sparkline dos últimos 7 períodos, como no Excel
+        dados_spark = df[colunas[max(3, len(colunas) - 7):]].apply(pd.to_numeric, errors="coerce").to_numpy(dtype=float)
     fmt = _formatador(df, cols)
     celulas = [[fmt(c, j, df.iloc[i][c]) for j, c in enumerate(colunas)] for i in range(len(df))]
     eh_texto = [bool(df[c].map(lambda v: isinstance(v, str)).any()) for c in colunas]
     cabec = [_cabecalho_2_linhas(c) for c in colunas]
+    if dados_spark is not None:
+        colunas.append(COL_SPARK)
+        for lin in celulas:
+            lin.append("")
+        eh_texto.append(False)
+        cabec.append(_cabecalho_2_linhas(COL_SPARK))
 
     def linha_total(i: int) -> bool:
         return i == 0 or any(("Total" in t or "合计" in t) for t in celulas[i][:2])
@@ -191,6 +229,8 @@ def tabela_png(df: pd.DataFrame, titulo: str, cols: dict | None = None, escala: 
     for j in range(len(colunas)):
         w = max([_largura(t, True, tam) for t in cabec[j] if t] + [_largura(celulas[i][j], linha_total(i), tam) for i in range(len(df))] + [0])
         larguras.append(w + 2 * pad)
+    if dados_spark is not None:
+        larguras[-1] = max(larguras[-1], 90 * s)
     total_w = sum(larguras)
     alt_cab = 2 * alt_lin if any(c[0] for c in cabec) else alt_lin
     larg_titulo = _largura(titulo, True, tam_t) + 4 * pad
@@ -232,6 +272,8 @@ def tabela_png(df: pd.DataFrame, titulo: str, cols: dict | None = None, escala: 
             texto_cel = celulas[i][j]
             alinha = "l" if (eh_texto[j] and not texto_cel.replace(",", "").replace(".", "").replace("%", "").strip().isdigit()) else "r"
             _desenhar(d, (x, y0, x + w, y1), texto_cel, cor, negrito, tam, alinha, pad)
+            if dados_spark is not None and j == len(larguras) - 1:
+                _sparkline(d, (x, y0, x + w, y1), dados_spark[i], s)
             x += w
 
     buf = io.BytesIO()

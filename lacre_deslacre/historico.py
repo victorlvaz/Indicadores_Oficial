@@ -9,10 +9,12 @@ Se as regras de exclusão mudarem no futuro, o que já está no banco continua c
 from datetime import datetime
 
 import pandas as pd
+
+from comum import original
 from sqlalchemy import (Column, DateTime, Date, Float, Index, Integer, MetaData, String, Table, Text,
                         and_, bindparam, delete, func, inspect, select)
 
-from comum.sql import apagar_por_chaves  # noqa: E402
+from comum.sql import apagar_por_chaves, apagar_por_ids, com_reconexao  # noqa: E402
 
 meta = MetaData()
 
@@ -38,6 +40,7 @@ viagens = Table(
     Column("deslacrado", Integer, nullable=False),
     Column("carregado_em", DateTime, nullable=False),
     Column("arquivo", String(250)),
+    Column("original", Text),                       # linha original do JMS (compactada), para a base exportada
     Index("ix_lacre_viagens_dia", "dia"),
 )
 
@@ -56,11 +59,12 @@ cargas = Table(
 )
 
 CHAVE = ["id", "cod_chegada", "chegada_plan"]
-_COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo")]
+_COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo", "original")]
 
 
 def preparar_tabelas(engine) -> None:
-    meta.create_all(engine)                       # só cria o que não existe
+    meta.create_all(engine)
+    original.garantir_coluna(engine, viagens)                       # só cria o que não existe
     colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
     if "chegada" not in colunas:                  # banco criado antes do nome da estação de chegada: acrescenta a coluna
         with engine.begin() as con:
@@ -76,7 +80,8 @@ def _para_registros(df: pd.DataFrame) -> list[dict]:
     return df.to_dict("records")
 
 
-def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observacao: str = "") -> dict:
+@com_reconexao
+def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observacao: str = "", ids_brutos=None) -> dict:
     """Grava a base tratada no histórico. Retorna {"novas": n, "atualizadas": n, "linhas": n}."""
     preparar_tabelas(engine)
     agora = datetime.now().replace(microsecond=0)
@@ -88,7 +93,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
     for c in ("hora_lacre", "hora_deslacre"):
         df[c] = df[c].where(df[c].notna(), None).map(lambda v: None if v is None else str(v))
     df = df.drop_duplicates(subset=CHAVE, keep="last")
-    df = df[_COLUNAS_BASE].copy()
+    df = df[_COLUNAS_BASE + (["original"] if "original" in df.columns else [])].copy()
     df["carregado_em"] = agora
     df["arquivo"] = arquivo[:250]
 
@@ -105,6 +110,8 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
 
         if repetidas:
             apagar_por_chaves(con, viagens, CHAVE, [(i, c, p.to_pydatetime()) for i, c, p in repetidas])
+        if ids_brutos:                                # reprocessa o arquivo inteiro: some também o que o filtro novo exclui
+            apagar_por_ids(con, viagens, ids_brutos)
         registros = _para_registros(df)
         for r in registros:
             r["chegada_plan"] = r["chegada_plan"].to_pydatetime()
@@ -127,11 +134,11 @@ def versao(engine) -> tuple:
     return int(n), str(ultimo)
 
 
-def ler(engine) -> pd.DataFrame:
+def ler(engine, com_original: bool = False) -> pd.DataFrame:
     """Histórico completo no mesmo formato da base tratada (colunas de calculos.preparar)."""
     preparar_tabelas(engine)
     with engine.connect() as con:
-        df = pd.read_sql(select(*[viagens.c[c] for c in _COLUNAS_BASE]), con)
+        df = pd.read_sql(select(*[viagens.c[c] for c in _COLUNAS_BASE + (["original"] if com_original else [])]), con)
     df["chegada_plan"] = pd.to_datetime(df["chegada_plan"])
     df["dia"] = pd.to_datetime(df["dia"])
     df["condutor"] = df["condutor"].fillna("")

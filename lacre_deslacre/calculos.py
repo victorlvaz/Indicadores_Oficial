@@ -1,6 +1,8 @@
 """Leitura, tratamento e regras dos indicadores (sem Streamlit)."""
 import pandas as pd
 
+from comum import original
+
 from . import periodos, textos as tx
 from .config import (APOIO, COL, INDICADORES, METAS, PEDIDO_MAE_MINIMO, ORDEM_TENDENCIA, REGIOES, ROTULOS,
                     STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO)
@@ -9,14 +11,13 @@ from .config import (APOIO, COL, INDICADORES, METAS, PEDIDO_MAE_MINIMO, ORDEM_TE
 # ---------- leitura ----------
 def ler_relatorio(origem, sheet_name=0) -> pd.DataFrame:
     """Lê o relatório extraído. O arquivo vem com extensão .xls mas costuma ser xlsx."""
-    precisa = set(COL.values())              # só as colunas usadas: lê bem mais rápido e ocupa menos memória
-    uso = lambda nome: str(nome).strip() in precisa or nome in precisa
+    # lê TODAS as colunas: a base exportada sai idêntica ao arquivo do JMS (ver comum/original.py)
     try:
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="openpyxl")
     except Exception:
         if hasattr(origem, "seek"):
             origem.seek(0)
-        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd", usecols=uso)
+        return pd.read_excel(origem, sheet_name=sheet_name, engine="xlrd")
 
 
 def carregar_apoio() -> dict:
@@ -70,7 +71,7 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
         diag[tx.DIAG["mesmo_sc"]] = int(sc.sum())
         b = b[~sc]
     if filtro_ponto_coleta:
-        fora = (b["tipo_linha"] == "COLETA") & ~b["partida"].isin(apoio["pontos_coleta"])
+        fora = (b["tipo_linha"] == "COLETA") & b["partida"].isin(apoio["pontos_coleta"])     # ponto de coleta = base do cliente: sai da Coleta
         diag[tx.DIAG["ponto_coleta"]] = int(fora.sum())
         b = b[~fora]
 
@@ -84,6 +85,7 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
         b = b[~ruim]
 
     diag[tx.DIAG["usadas"]] = len(b)
+    b = original.anexar(b, df)                          # linha original do JMS (todas as colunas) para a base exportada
     return b.reset_index(drop=True), diag
 
 

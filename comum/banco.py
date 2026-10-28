@@ -48,7 +48,7 @@ def engine():
     if url.startswith("mssql+pymssql"):        # Azure SQL grátis pausa sozinho: a 1ª conexão pode levar ~1 min para acordar
         args = {"login_timeout": 90, "timeout": 90}
     elif url.startswith("postgresql"):          # Neon dorme após 5 min sem uso: acorda em poucos segundos na 1ª conexão
-        args = {"connect_timeout": 60}
+        args = {"connect_timeout": 60, "keepalives": 1, "keepalives_idle": 30, "keepalives_interval": 10, "keepalives_count": 5}   # mantém a conexão viva durante comandos longos
     return create_engine(url, pool_pre_ping=True, pool_recycle=240, connect_args=args)
 
 

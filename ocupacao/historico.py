@@ -5,6 +5,9 @@ atualiza as linhas e acrescenta as novas, sem duplicar."""
 from datetime import datetime
 
 import pandas as pd
+
+from comum import original
+from comum.sql import apagar_por_ids, com_reconexao
 from sqlalchemy import (Column, Date, DateTime, Float, Index, Integer, MetaData, String, Table, Text, delete, func, inspect,
                         select)
 
@@ -29,6 +32,7 @@ viagens = Table(
     Column("volume", Float),
     Column("carregado_em", DateTime, nullable=False),
     Column("arquivo", String(250)),
+    Column("original", Text),                       # linha original do JMS (compactada), para a base exportada
     Index("ix_oc_viagens_dia", "dia"),
 )
 
@@ -46,11 +50,12 @@ cargas = Table(
     Column("observacao", Text),
 )
 
-_COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo")]
+_COLUNAS_BASE = [c.name for c in viagens.columns if c.name not in ("carregado_em", "arquivo", "original")]
 
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)
+    original.garantir_coluna(engine, viagens)
     colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
     if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
         with engine.begin() as con:
@@ -62,7 +67,8 @@ def _para_registros(df: pd.DataFrame) -> list[dict]:
     return df.to_dict("records")
 
 
-def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observacao: str = "") -> dict:
+@com_reconexao
+def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observacao: str = "", ids_brutos=None) -> dict:
     preparar_tabelas(engine)
     agora = datetime.now().replace(microsecond=0)
     df = base.copy()
@@ -70,7 +76,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
     df["dia"] = pd.to_datetime(df["dia"]).dt.date
     df["saida_plan"] = pd.to_datetime(df["saida_plan"])
     df = df.drop_duplicates(subset=["id"], keep="last")
-    df = df[_COLUNAS_BASE].copy()
+    df = df[_COLUNAS_BASE + (["original"] if "original" in df.columns else [])].copy()
     df["carregado_em"] = agora
     df["arquivo"] = arquivo[:250]
     if df.empty:
@@ -86,6 +92,8 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
             lista = list(existentes)
             for i in range(0, len(lista), 500):
                 con.execute(delete(viagens).where(viagens.c.id.in_(lista[i:i + 500])))
+        if ids_brutos:                                # reprocessa o arquivo inteiro: some também o que o filtro novo exclui
+            apagar_por_ids(con, viagens, ids_brutos)
         registros = _para_registros(df)
         for r in registros:
             if r["saida_plan"] is not None:
@@ -107,10 +115,10 @@ def versao(engine) -> tuple:
     return int(n), str(ultimo)
 
 
-def ler(engine) -> pd.DataFrame:
+def ler(engine, com_original: bool = False) -> pd.DataFrame:
     preparar_tabelas(engine)
     with engine.connect() as con:
-        df = pd.read_sql(select(*[viagens.c[c] for c in _COLUNAS_BASE]), con)
+        df = pd.read_sql(select(*[viagens.c[c] for c in _COLUNAS_BASE + (["original"] if com_original else [])]), con)
     df["saida_plan"] = pd.to_datetime(df["saida_plan"])
     df["dia"] = pd.to_datetime(df["dia"])
     df["volume"] = pd.to_numeric(df["volume"], errors="coerce")

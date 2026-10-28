@@ -88,7 +88,6 @@ def _secao(base, tipo, regional, freq, per, ini_ano, fim_ano, export):
         st.dataframe(estilizada, width="stretch", hide_index=True, height=min((len(cru) + 1) * 35 + 3, 420))
     exp = cru.copy()
     exp[tx.COL_VAR] = exp[tx.COL_VAR] * 100
-    export[tx.aba_excel_resumo(tipo)] = (exp, {"taxa": tx.COL_TAXA, "pp_extra": [tx.COL_VAR]})
 
 
 def mostrar(base: pd.DataFrame, export: dict, dia=None) -> None:

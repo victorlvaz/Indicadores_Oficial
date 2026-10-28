@@ -1,5 +1,5 @@
-"""Regra comum das abas Resumo: na visão "Dia", o Resumo segue o dia escolhido na barra lateral.
-Semana e Mês continuam independentes (botões próprios da aba)."""
+"""Regra comum das abas Resumo: os filtros Dia/Semana/Mês são da PRÓPRIA aba (não seguem a barra lateral).
+Na visão "Dia" a aba tem seu próprio seletor de data; vazio = todos os dias do período (ano) escolhido."""
 import pandas as pd
 import streamlit as st
 
@@ -7,13 +7,17 @@ from .idioma import bi
 
 
 def dia_lateral(gran: str, ini):
-    """Dia escolhido na barra lateral (None se a barra não está em 'Dia' ou está em 'Todos')."""
-    return pd.Timestamp(ini) if gran == "D" and ini is not None else None
+    """Mantida por compatibilidade: a aba Resumo não segue mais a barra lateral."""
+    return None
 
 
-def aplicar(freq: str, ini, fim, dia):
-    """Visão Dia + dia da barra lateral -> (ini, fim) = só esse dia. Caso contrário devolve o que veio."""
-    if freq != "D" or dia is None:
+def aplicar(freq: str, ini, fim, dia=None):
+    """Visão Dia -> seletor de data próprio da aba (vazio = todos os dias). Semana/Mês: devolve o que veio."""
+    if freq != "D":
         return ini, fim
-    st.caption(bi("日视图：跟随左侧边栏所选日期", "Visão Dia: segue o dia escolhido na barra lateral") + f" · {dia:%d/%m/%Y}")
-    return dia, dia
+    escolhido = st.date_input(bi("选择日期（留空=全部日期）", "Dia (vazio = todos os dias do período)"),
+                              value=None, format="DD/MM/YYYY", key="resumo_dia_proprio")
+    if escolhido is None:
+        return ini, fim
+    d = pd.Timestamp(escolhido)
+    return d, d

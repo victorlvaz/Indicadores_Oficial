@@ -3,9 +3,12 @@ import pandas as pd
 import streamlit as st
 
 from comum import banco, feishu_envio, periodos, resumo_dia
-from comum.consolidado import painel_carga
+from comum import previa
+from comum.consolidado import painel_carga, pendente
 from comum.estilos import estilizar_tabela, estilizar_tendencia
-from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
+from comum import original
+from pontualidade.config import COL as COL_JMS
+from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -49,17 +52,18 @@ try:
     eng = banco.engine()
     versao = historico.versao(eng)
 except Exception as erro:
-    st.error(tx.ERRO_BANCO + str(erro))
+    st.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
     st.stop()
 
 # ---------- Carga: sobe o relatório consolidado (alimenta Lacre, Uso de APP e Pontualidade) ----------
-painel_carga(eng)
+arquivos_pendentes = painel_carga(eng)
+pend, ids_pend = pendente(arquivos_pendentes, "pt", versao)
 
-if versao[0] == 0:
+if versao[0] == 0 and pend is None:
     st.info(tx.INFO_SEM_ARQUIVO)
     st.stop()
 
-base = _historico(versao)
+base = previa.combinar("pt_ver", _historico(versao) if versao[0] else None, pend, historico.CHAVE, ids_pend)   # só o enviado ou histórico + enviado
 if base.empty:
     st.warning(tx.AVISO_BASE_VAZIA)
     st.stop()
@@ -142,7 +146,10 @@ with abas[2]:
             st.info(tx.INFO_UM_DIA)
             t_tab = t
             st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-        export[tx.aba_excel_tendencia(ind, tipo)] = (t_tab, {})
+        if gran == "W" and ini is not None:      # semana: o Excel traz os DIAS da semana escolhida (não S01, S02...)
+            _td = tendencia(vis[tipo][vis[tipo]["dia"] >= pd.Timestamp(ini)], tipo, "D", fim)
+            t_tab = _td if not _td.empty else t_tab
+        export[tx.aba_excel_tendencia(ind, tipo)] = (t_tab, {"sparkline": True})
 
 with abas[3]:
     resumo_ui.mostrar(base, ind, export, dia=resumo_dia.dia_lateral(gran, ini))
@@ -157,9 +164,9 @@ with abas[4]:
     st.subheader(tx.SUB_BASE)
     sub = base if ini is None else base[(dias >= ini) & (dias <= fim)]
     st.caption(f"{len(sub):,}".replace(",", ".") + " linhas · " + per_txt)
-    st.dataframe(sub.head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
+    st.dataframe(sub.drop(columns=["original"], errors="ignore").head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
 
-export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
+export_final = original.base_primeiro(export, eng, historico.trechos, historico.CHAVE, "dia_saida", sub, COL_JMS)      # 1ª aba: base idêntica ao JMS
 titulo_xl = titulo_relatorio("paginas/pontualidade_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, dias)
 nome_xl = tx.arquivo_excel(ind, "Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))

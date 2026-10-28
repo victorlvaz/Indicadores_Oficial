@@ -6,10 +6,12 @@ Trechos que viraram Cancelado/Planejado no arquivo novo saem do histórico."""
 from datetime import datetime
 
 import pandas as pd
+
+from comum import original
 from sqlalchemy import (Column, Date, DateTime, Index, Integer, MetaData, String, Table, Text, and_, bindparam,
                         delete, func, select)
 
-from comum.sql import apagar_por_chaves  # noqa: E402
+from comum.sql import apagar_por_chaves, com_reconexao  # noqa: E402
 
 meta = MetaData()
 
@@ -37,6 +39,7 @@ trechos = Table(
     Column("aberto_chegada", Integer, nullable=False),
     Column("carregado_em", DateTime, nullable=False),
     Column("arquivo", String(250)),
+    Column("original", Text),                       # linha original do JMS (compactada), para a base exportada
     Index("ix_pt_trechos_dia_saida", "dia_saida"),
     Index("ix_pt_trechos_dia_chegada", "dia_chegada"),
 )
@@ -56,12 +59,13 @@ cargas = Table(
 )
 
 CHAVE = ["id", "cod_partida", "cod_chegada", "saida_plan"]
-_COLUNAS_BASE = [c.name for c in trechos.columns if c.name not in ("carregado_em", "arquivo")]
+_COLUNAS_BASE = [c.name for c in trechos.columns if c.name not in ("carregado_em", "arquivo", "original")]
 _DATAS_HORA = ("saida_plan", "saida_real", "chegada_plan", "chegada_real")
 
 
 def preparar_tabelas(engine) -> None:
     meta.create_all(engine)
+    original.garantir_coluna(engine, trechos)
 
 
 def _py(df: pd.DataFrame) -> list[dict]:
@@ -75,6 +79,7 @@ def _py(df: pd.DataFrame) -> list[dict]:
     return regs
 
 
+@com_reconexao
 def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, descartadas: pd.DataFrame | None = None,
            observacao: str = "") -> dict:
     """Grava a base tratada. Retorna {"novas": n, "atualizadas": n, "linhas": n}."""
@@ -83,7 +88,7 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, descarta
     df = base.copy()
     df["dia_saida"] = pd.to_datetime(df["dia_saida"]).dt.date
     df["dia_chegada"] = pd.to_datetime(df["dia_chegada"]).dt.date
-    df = df.drop_duplicates(subset=CHAVE, keep="last")[_COLUNAS_BASE].copy()
+    df = df.drop_duplicates(subset=CHAVE, keep="last")[_COLUNAS_BASE + (["original"] if "original" in df.columns else [])].copy()
     df["carregado_em"] = agora
     df["arquivo"] = arquivo[:250]
     if df.empty:
@@ -128,11 +133,11 @@ def versao(engine) -> tuple:
     return int(n), str(ultimo)
 
 
-def ler(engine) -> pd.DataFrame:
+def ler(engine, com_original: bool = False) -> pd.DataFrame:
     """Histórico completo no formato da base tratada."""
     preparar_tabelas(engine)
     with engine.connect() as con:
-        df = pd.read_sql(select(*[trechos.c[c] for c in _COLUNAS_BASE]), con)
+        df = pd.read_sql(select(*[trechos.c[c] for c in _COLUNAS_BASE + (["original"] if com_original else [])]), con)
     for c in _DATAS_HORA + ("dia_saida", "dia_chegada"):
         df[c] = pd.to_datetime(df[c])
     for c in ("ok_saida", "ok_chegada", "aberto_saida", "aberto_chegada"):

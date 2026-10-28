@@ -91,9 +91,9 @@ INFO_SEM_ARQUIVO = frase("历史数据库为空：请在左侧上传 JMS 集货�
 SALVAR_SEM_TECHIS = frase("保存前需要上传 TECHIS 导出文件（否则实际监控次数为 0）。",              # [revisar]
                           "Para salvar, envie também a extração do TECHIS (sem ela os SMs realizados ficariam em 0).")
 SALVAR_SEM_JMS = frase("请先上传 JMS 报表。", "Envie antes ao menos um relatório do JMS.")      # [revisar]
-VER_TITULO = bi("查看范围", "O que mostrar")                                                   # [revisar]
-VER_ENVIADO = bi("仅上传的数据", "Só o que enviei")                                          # [revisar]
-VER_HISTORICO = bi("历史 + 上传的数据", "Histórico + o que enviei")                          # [revisar]
+VER_TITULO = bi("查看与导出范围", "Visualização e exportação")                                                   # [revisar]
+VER_ENVIADO = bi("仅上传的数据", "Só o que enviei (visualização)")                                          # [revisar]
+VER_HISTORICO = bi("历史 + 上传的数据", "Soma com o histórico")                          # [revisar]
 VER_AJUDA = ("Só o que enviei: os números vêm apenas dos arquivos enviados, sem somar o histórico. "
              "Histórico + o que enviei: o histórico salvo com os arquivos enviados por cima.")
 AVISO_SO_ENVIADO = frase("当前仅显示已上传的文件，未合并历史数据；保存后才会计入历史。",             # [revisar]

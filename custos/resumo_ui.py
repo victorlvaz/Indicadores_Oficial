@@ -137,7 +137,6 @@ def _secao(base, regional, freq, ini, fim, export):
         st.dataframe(estilizada, width="stretch", hide_index=True, height=min((len(cru) + 1) * 35 + 3, 420))
     exp = cru.copy()
     exp[tx.COL_VAR_PACOTE] = exp[tx.COL_VAR_PACOTE] * 100
-    export[tx.RES_SECAO[:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_PACOTE]})
 
 
 def mostrar(base: pd.DataFrame, export: dict, dia=None) -> None:

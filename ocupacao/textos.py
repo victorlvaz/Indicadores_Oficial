@@ -81,7 +81,7 @@ NOTAS = {
     "ENTREGA": (
         ["备注：以始发区域统计", "逻辑：装载率 = 实际装载票数 / 车型核载票数（上限100%）", "运输状态：”已完成“，”在途“"],
         ["Obs: considerar a região de origem.", _NOTA_COMUM_PT,
-         "Entrega: viagens com volume vazio contam como 0 carregado (igual à planilha); ignora volume 0 e 1."]),
+         "Entrega: ignora viagens com volume vazio, 0 ou 1."]),
 }
 
 
@@ -101,9 +101,10 @@ DIAG = {
     "sem_data": bi("无计划发车时间/线路类型", "Sem data de saída planejada ou tipo de linha"),
     "status": bi("剔除：状态非已完成/在途", "Removidas: status fora de Concluído/Em Trânsito"),
     "mesmo_sc": bi("剔除：同场线路", "Removidas: rota do mesmo SC"),
+    "ponto_coleta": bi("剔除：揽收业务网点的集货（客户场地）", "Removidas: coleta em ponto de coleta (base do cliente)"),
     "franqueado": bi("剔除：加盟商承运商", "Removidas: transportador Franqueado"),
     "pedido_mae": bi("剔除：装载票数为空/0/1", "Removidas: pedido mãe vazio, 0 ou 1"),
-    "sem_capacidade": bi("车型无核载票数（保留，不计装载率）", "Tipo de veículo sem capacidade (mantidas)"),
+    "sem_capacidade": bi("剔除：车型无核载票数（如 Barco）", "Removidas: tipo de veículo sem capacidade cadastrada (ex.: Barco)"),
     "usadas": bi("使用行数", "Linhas usadas"),
 }
 

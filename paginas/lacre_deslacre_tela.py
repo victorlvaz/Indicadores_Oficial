@@ -3,9 +3,13 @@ import pandas as pd
 import streamlit as st
 
 from comum import banco, feishu_envio, resumo_dia
-from comum.consolidado import painel_carga
+from comum.exportar import sem_ba_na_coleta
+from comum import previa
+from comum.consolidado import painel_carga, pendente
 from comum.estilos import estilizar_tabela, estilizar_tendencia
-from comum.exportar import base_primeiro, para_excel, periodo_texto, titulo_relatorio
+from comum import original
+from lacre_deslacre.config import COL as COL_JMS
+from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
@@ -42,17 +46,18 @@ try:
     eng = banco.engine()
     versao = historico.versao(eng)
 except Exception as erro:                                  # banco fora do ar, senha errada, sem driver...
-    st.error(tx.ERRO_BANCO + str(erro))
+    st.error(tx.ERRO_BANCO + str(erro).split("[SQL:")[0].strip()[:400])
     st.stop()
 
 # ---------- Carga: sobe o relatório consolidado (alimenta Lacre, Uso de APP e Pontualidade) ----------
-painel_carga(eng)
+arquivos_pendentes = painel_carga(eng)
+pend, ids_pend = pendente(arquivos_pendentes, "lacre", versao)
 
-if versao[0] == 0:
+if versao[0] == 0 and pend is None:
     st.info(tx.INFO_SEM_ARQUIVO)
     st.stop()
 
-base = _historico(versao)
+base = previa.combinar("lac_ver", _historico(versao) if versao[0] else None, pend, historico.CHAVE, ids_pend)   # só o enviado ou histórico + enviado
 if base.empty:
     st.warning(tx.AVISO_BASE_VAZIA)
     st.stop()
@@ -135,7 +140,10 @@ for aba, evento in zip(abas[4:6], ["lacre", "deslacre"]):
                 st.info(tx.INFO_UM_DIA)
                 t_tab = t
                 st.dataframe(estilizar_tendencia(t), width="stretch", hide_index=True)
-            export[tx.aba_excel_tendencia(tipo, evento)] = (t_tab, {})
+            if gran == "W" and ini is not None:      # semana: o Excel traz os DIAS da semana escolhida (não S01, S02...)
+                _td = tendencia(base[base["dia"] >= pd.Timestamp(ini)], tipo, evento, "D", fim)
+                t_tab = _td if not _td.empty else t_tab
+            export[tx.aba_excel_tendencia(tipo, evento)] = (t_tab, {"sparkline": True})
 
 with abas[6]:
     resumo_ui.mostrar(base, export, dia=resumo_dia.dia_lateral(gran, ini))
@@ -150,9 +158,11 @@ with abas[7]:
     st.subheader(tx.SUB_BASE)
     sub = base if ini is None else base[(base["dia"] >= ini) & (base["dia"] <= fim)]
     st.caption(f"{len(sub):,}".replace(",", ".") + " linhas · " + per_txt)
-    st.dataframe(sub.head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
+    st.dataframe(sub.drop(columns=["original"], errors="ignore").head(5000).rename(columns=tx.COLUNAS_BASE), width="stretch", hide_index=True, height=400)
 
-export_final = base_primeiro(export, sub.rename(columns=tx.COLUNAS_BASE))      # 1ª aba do arquivo: a base já tratada
+for _k in list(export):                       # BA não tem coleta: sai das abas de COLETA (export e bot)
+    export[_k] = (sem_ba_na_coleta(_k, export[_k][0]),) + tuple(export[_k][1:])
+export_final = original.base_primeiro(export, eng, historico.viagens, historico.CHAVE, "dia", sub, COL_JMS)      # 1ª aba: base idêntica ao JMS
 titulo_xl = titulo_relatorio("paginas/lacre_deslacre_tela.py")                       # linha de título do Excel: nome do relatório + data
 periodo_xl = periodo_texto(ini, fim, base["dia"])
 nome_xl = tx.arquivo_excel("Todos" if ini is None else periodos.rotulo_curto(ini, gran).replace("/", "."))
@@ -165,7 +175,11 @@ feishu_envio.botao(
     excel=lambda: para_excel(export_final, titulo_xl, periodo_xl),
     abertura=("Segue a Taxa de **Lacre** e **Deslacre** da Secundária do dia {d}.", "以下是{d}二次封签和拆签的费用。"),
     blocos=[("img", [("Lacre " if ev == "lacre" else "Deslacre ", False), (tp, True), (":", False)], [tx.aba_excel_tabela(tp, ev)])
-            for tp, ev in INDICADORES] + [("comentario",)])
+            for tp, ev in INDICADORES]
+    + [("img", [(f"Tendência {nm} - ", False), ("COLETA", True), ("/ ", False), ("ENTREGA", True), (":", False)],
+        [tx.aba_excel_tendencia("COLETA", ev), tx.aba_excel_tendencia("ENTREGA", ev)])
+       for ev, nm in (("lacre", "Lacre"), ("deslacre", "Deslacre"))]
+    + [("comentario",)])
 
 
 # ---------- Exportar um intervalo livre (de/até): o acumulado do período escolhido, comparado ao intervalo anterior de mesmo tamanho ----------
@@ -195,7 +209,7 @@ with st.sidebar.expander(tx.PER_EXPORT):
                     exp_f[tx.aba_excel_tabela(tipo, evento)] = (
                         t_f, {"taxa": c_taxa, "meta": c_meta, "pct_extra": [tx.COL_COMP], "pp_extra": [tx.COL_VAR]},
                         tx.nota_texto(evento))
-                exp_f = base_primeiro(exp_f, base[(base["dia"] >= ini_f) & (base["dia"] <= fim_f)].rename(columns=tx.COLUNAS_BASE))
+                exp_f = original.base_primeiro(exp_f, eng, historico.viagens, historico.CHAVE, "dia", base[(base["dia"] >= ini_f) & (base["dia"] <= fim_f)], COL_JMS)
                 return para_excel(exp_f, titulo_xl, periodo_texto(ini_f, fim_f, base["dia"]))
             st.download_button(
                 tx.PER_EXPORT_BOTAO, data=_excel_faixa, key="lac_baixar_faixa",

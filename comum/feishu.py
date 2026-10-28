@@ -7,7 +7,8 @@ Segredos (Streamlit: Settings > Secrets; local: .streamlit/secrets.toml):
     [feishu]
     app_id     = "cli_xxxxxxxx"
     app_secret = "xxxxxxxx"
-    chat_id    = "oc_xxxxxxxx"                      # grupo de destino (o bot precisa estar no grupo)
+    chat_id    = "oc_xxxxxxxx"                      # grupo OFICIAL (o bot precisa estar no grupo)
+    chat_id_teste = "oc_yyyyyyyy"                   # opcional: grupo de TESTE; se existir, a tela pede para escolher o destino
     dominio    = "https://open.feishu.cn"           # Lark internacional: "https://open.larksuite.com"
     senha      = "opcional"                         # se existir, o envio pede essa senha
 """
@@ -26,10 +27,22 @@ def configuracao(secrets) -> dict | None:
         bloco = dict(secrets["feishu"])
     except Exception:                                   # sem secrets.toml / sem o bloco
         return None
-    if not all(str(bloco.get(k, "")).strip() for k in ("app_id", "app_secret", "chat_id")):
+    if not all(str(bloco.get(k, "")).strip() for k in ("app_id", "app_secret")):
+        return None
+    if not (str(bloco.get("chat_id", "")).strip() or str(bloco.get("chat_id_teste", "")).strip()):
         return None
     bloco["dominio"] = str(bloco.get("dominio") or DOMINIO_PADRAO).rstrip("/")
     return bloco
+
+
+def destinos(cfg: dict) -> list[str]:
+    """Destinos disponíveis: "teste" (primeiro, é o padrão) e "oficial"."""
+    return [d for d, k in (("teste", "chat_id_teste"), ("oficial", "chat_id")) if str(cfg.get(k, "")).strip()]
+
+
+def com_destino(cfg: dict, destino: str) -> dict:
+    """Cópia da configuração apontando para o grupo escolhido ("teste" | "oficial")."""
+    return {**cfg, "chat_id": cfg["chat_id_teste"] if destino == "teste" else cfg["chat_id"]}
 
 
 def _resposta(r: requests.Response, o_que: str) -> dict:
@@ -55,10 +68,24 @@ def subir_imagem(cfg: dict, tk: str, png: bytes, nome: str = "tabela.png") -> st
 
 
 def subir_arquivo(cfg: dict, tk: str, nome: str, dados: bytes) -> str:
-    """Sobe um arquivo qualquer (ex.: o Excel exportado) e devolve o file_key."""
-    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/files", headers={"Authorization": f"Bearer {tk}"},
-                      data={"file_type": "stream", "file_name": nome}, files={"file": (nome, dados)}, timeout=120)
-    return _resposta(r, "envio do arquivo")["data"]["file_key"]
+    """Sobe um arquivo qualquer (ex.: o Excel exportado) e devolve o file_key.
+    Arquivos grandes às vezes dão erro 5xx/tempo esgotado no Feishu: tenta até 3 vezes antes de desistir."""
+    import time
+    mb = len(dados) / 1_048_576
+    ultimo = None
+    for tentativa in range(3):
+        try:
+            r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/files", headers={"Authorization": f"Bearer {tk}"},
+                              data={"file_type": "stream", "file_name": nome}, files={"file": (nome, dados)}, timeout=300)
+            if r.status_code < 500:
+                return _resposta(r, "envio do arquivo")["data"]["file_key"]
+            ultimo = f"HTTP {r.status_code}"
+        except (requests.Timeout, requests.ConnectionError) as erro:
+            ultimo = type(erro).__name__
+        if tentativa < 2:
+            time.sleep(3 * (tentativa + 1))
+    raise RuntimeError(f"Feishu (envio do arquivo): o servidor não aceitou o arquivo de {mb:.1f} MB após 3 tentativas ({ultimo}). "
+                       "Tente de novo em instantes; se persistir, envie o Excel sem a base (ou menos dias).")
 
 
 def enviar_arquivo(cfg: dict, tk: str, file_key: str) -> str:

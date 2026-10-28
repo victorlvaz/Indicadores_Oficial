@@ -39,7 +39,7 @@ STATUS_VALIDOS = ("Concluído", "Em Trânsito")
 TRANSPORTADOR_EXCLUIDO = "Franqueado"
 # Pedido mãe (volume carregado): na planilha, a COLETA remove vazio, 0 e 1; a ENTREGA mantém o vazio (conta volume 0)
 # e só remove 0 e 1. Valores: ("vazio", "zero_um") = o que remover.
-PEDIDO_MAE_REMOVER = {"COLETA": ("vazio", "zero_um"), "ENTREGA": ("zero_um",)}
+PEDIDO_MAE_REMOVER = {"COLETA": ("vazio", "zero_um"), "ENTREGA": ("vazio", "zero_um")}
 # A Coleta NÃO filtra "rota com coleta" (lista 揽收业务网点) neste relatório: a planilha não usa essa coluna.
 
 META = None            # sem meta definida; com um valor (ex.: 0.80) o que ficar abaixo fica em vermelho

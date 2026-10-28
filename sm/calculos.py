@@ -13,6 +13,8 @@ import io
 
 import pandas as pd
 
+from comum.original import coluna_indesejada
+
 from comum import periodos
 from . import config as cfg
 from . import textos as tx
@@ -204,7 +206,7 @@ def base_para_exportar(base: pd.DataFrame, tipo: str) -> pd.DataFrame:
     o arquivo exportado pode ser enviado de volta no campo Histórico."""
     sub = base[base["tipo"] == tipo]
     internas = set(INTERNAS + ["sm_contagem", "sm_real"])
-    originais = [c for c in sub.columns if c not in internas and sub[c].notna().any()]
+    originais = [c for c in sub.columns if c not in internas and sub[c].notna().any() and not coluna_indesejada(c)]
     out = sub[originais].copy()
     for k, nomes in COL_JMS.items():                    # linhas vindas do banco não têm as colunas originais do JMS
         if k in sub.columns:
