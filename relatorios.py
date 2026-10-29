@@ -15,8 +15,8 @@ RELATORIOS = [
         "arquivo": "paginas/lacre_deslacre_tela.py",
         "url": "lacre-deslacre",
         "icone": ":material/lock:",
-        "descricao": frase("按区域统计封车率与解车率（集货与散货），含排名、目标和每日趋势。",
-                           "Taxa de lacramento e deslacramento por região (Coleta e Entrega), "
+        "descricao": frase("按区域统计封车率、解车率与封车准点率（集货与散货），含排名、目标和每日趋势。",
+                           "Taxa de lacre, deslacre e pontualidade do lacre por região (Coleta e Entrega), "
                            "ranking, metas e tendência diária."),
     },
     {
