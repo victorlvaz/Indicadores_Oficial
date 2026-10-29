@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 import streamlit as st
 
 from comum import periodos, resumo_dia
-from comum.tema import CINZA_DESTAQUE, VERMELHO
+from comum.tema import CINZA_DESTAQUE, VERDE, VERMELHO
 from comum.uploads import opcao_valida
 from . import textos as tx
 from .calculos import por_veiculo, regioes_da, resumo, tabela_periodo
@@ -94,6 +94,7 @@ def _tabela(df):
     est = pd.DataFrame("", index=txt.index, columns=txt.columns)
     est.iloc[0, :] = f"background-color:{CINZA_DESTAQUE};font-weight:700"
     est.loc[(cru[tx.COL_VAR_PACOTE].round(4) > 0).fillna(False), tx.COL_VAR_PACOTE] = f"color:{VERMELHO};font-weight:700"
+    est.loc[(cru[tx.COL_VAR_PACOTE].round(4) < 0).fillna(False), tx.COL_VAR_PACOTE] = f"color:{VERDE};font-weight:700"
     return cru, txt.style.apply(lambda _: est, axis=None)
 
 

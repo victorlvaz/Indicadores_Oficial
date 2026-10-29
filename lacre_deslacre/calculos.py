@@ -4,7 +4,7 @@ import pandas as pd
 from comum import original
 
 from . import periodos, textos as tx
-from .config import (APOIO, COL, INDICADORES, METAS, PEDIDO_MAE_MINIMO, ORDEM_TENDENCIA, REGIOES, ROTULOS,
+from .config import (APOIO, COL, INDICADORES, META_PONT_LACRE, METAS, MINUTOS_LACRE_ANTES, PEDIDO_MAE_MINIMO, ORDEM_TENDENCIA, REGIOES, ROTULOS,
                     STATUS_VALIDOS, TRANSPORTADOR_EXCLUIDO)
 
 
@@ -31,13 +31,22 @@ def _preenchido(s: pd.Series) -> pd.Series:
     return s.notna() & s.astype(str).str.strip().ne("")
 
 
+def _lacre_no_prazo(hora_lacre: pd.Series, saida_plan: pd.Series) -> pd.Series:
+    """1 = lacrou em dia anterior ao da partida planejada OU com ≥ 10 min de antecedência; 0 = atrasou ou sem lacre;
+    vazio (NA) = sem a partida planejada no arquivo (não dá para avaliar)."""
+    lac = pd.to_datetime(hora_lacre.where(_preenchido(hora_lacre)), errors="coerce")
+    ok = lac.notna() & ((lac.dt.normalize() < saida_plan.dt.normalize())
+                        | ((saida_plan - lac) >= pd.Timedelta(minutes=MINUTOS_LACRE_ANTES)))
+    return ok.astype("Int64").where(saida_plan.notna(), pd.NA)
+
+
 # ---------- tratamento ----------
 def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
              filtro_mesmo_sc=True, filtro_ponto_coleta=True,
              filtro_franqueado=True, filtro_pedido_mae=True):
     """Retorna (base tratada, diagnóstico de linhas removidas por regra)."""
     apoio = apoio or carregar_apoio()
-    opcionais = {COL["chegada"], COL["condutor"]}                      # relatório sem o nome da estação de chegada ainda é aceito
+    opcionais = {COL["chegada"], COL["condutor"], COL["saida_plan"]}                      # relatório sem o nome da estação de chegada ainda é aceito
     faltando = [nome for nome in COL.values() if nome not in df.columns and nome not in opcionais]
     if faltando:
         raise ValueError(tx.ERRO_COLUNAS + ", ".join(faltando))
@@ -55,6 +64,8 @@ def preparar(df: pd.DataFrame, apoio: dict | None = None, *, filtro_status=True,
     b["dia"] = b["chegada_plan"].dt.normalize()
     b["pedido_mae"] = pd.to_numeric(b["pedido_mae"], errors="coerce")
     b["lacrado"] = _preenchido(b["hora_lacre"]).astype(int)
+    b["saida_plan"] = pd.to_datetime(b["saida_plan"], errors="coerce")
+    b["lacre_prazo"] = _lacre_no_prazo(b["hora_lacre"], b["saida_plan"])
     b["deslacrado"] = _preenchido(b["hora_deslacre"]).astype(int)
 
     diag = {tx.DIAG["lidas"]: len(b)}
@@ -218,3 +229,94 @@ def regionais(base: pd.DataFrame, tipo: str, evento: str) -> list[str]:
     col = INDICADORES[(tipo, evento)]["regiao_col"]
     sub = base[base["tipo_linha"] == tipo]
     return [r for r in _regioes(sub, col) if (sub[col] == r).any()]
+
+
+# ---------- Pontualidade do lacre ----------
+def base_pont_lacre(base: pd.DataFrame) -> pd.DataFrame:
+    """Só as viagens com a partida planejada conhecida (dias salvos antes da coluna existir ficam de fora)."""
+    if "lacre_prazo" not in base.columns:
+        return base.iloc[0:0]
+    return base[base["lacre_prazo"].notna()]
+
+
+def dias_sem_partida(base: pd.DataFrame) -> int:
+    """Quantos dias do histórico não têm a partida planejada (precisam ser enviados de novo)."""
+    if "lacre_prazo" not in base.columns:
+        return base["dia"].nunique()
+    return int(base.loc[base["lacre_prazo"].isna(), "dia"].nunique())
+
+
+def tabela_pont_lacre(base: pd.DataFrame, tipo: str, ini=None, fim=None) -> pd.DataFrame:
+    """Por regional de saída: previsto, lacrado, no prazo, taxa de lacre, pontualidade (no prazo/previsto), % entre lacrados."""
+    sub = base_pont_lacre(base)
+    sub = sub[sub["tipo_linha"] == tipo]
+    if ini is not None:
+        sub = sub[(sub["dia"] >= pd.Timestamp(ini)) & (sub["dia"] <= pd.Timestamp(fim if fim is not None else ini))]
+    sub = sub.assign(lacre_prazo=sub["lacre_prazo"].astype(int))
+    g = sub.groupby("reg_saida").agg(prev=("lacrado", "size"), lac=("lacrado", "sum"), prazo=("lacre_prazo", "sum"))
+    g = g.reindex(_regioes(sub, "reg_saida"), fill_value=0)
+    g.index.name = "regiao"
+    g = g.reset_index()
+    g["taxa_lac"] = (g["lac"] / g["prev"]).where(g["prev"] > 0)
+    g["pont"] = (g["prazo"] / g["prev"]).where(g["prev"] > 0)
+    g["pont_lac"] = (g["prazo"] / g["lac"]).where(g["lac"] > 0)
+    g["meta"] = META_PONT_LACRE
+    g["ranking"] = g["pont"].fillna(0).rank(method="min", ascending=False).astype(int)
+    g = g.sort_values(["ranking", "prev"], ascending=[True, False]).reset_index(drop=True)
+    prev, lac, prazo = int(g["prev"].sum()), int(g["lac"].sum()), int(g["prazo"].sum())
+    nan = float("nan")
+    total = pd.DataFrame([{"regiao": "合计 Total", "prev": prev, "lac": lac, "prazo": prazo,
+                           "taxa_lac": lac / prev if prev else nan, "pont": prazo / prev if prev else nan,
+                           "pont_lac": prazo / lac if lac else nan, "meta": META_PONT_LACRE, "ranking": None}])
+    out = pd.concat([total, g], ignore_index=True)
+    out.insert(0, "n", ["合计"] + list(range(1, len(g) + 1)))
+    return out
+
+
+def comparar_pont_lacre(atual: pd.DataFrame, comp: pd.DataFrame) -> pd.DataFrame:
+    taxa = comp.set_index("regiao")["pont"]
+    out = atual.copy()
+    out["pont_comp"] = out["regiao"].map(taxa)
+    out["variacao"] = out["pont"] - out["pont_comp"]
+    return out
+
+
+def rotular_pont_lacre(tab: pd.DataFrame) -> pd.DataFrame:
+    return tab.rename(columns={
+        "n": "序号 Nº", "regiao": "发车区域 Região Saída", "prev": tx.PL_PREV, "lac": tx.PL_LAC, "prazo": tx.PL_PRAZO,
+        "taxa_lac": tx.PL_TAXA_LAC, "pont": tx.PL_PONT, "pont_lac": tx.PL_PONT_LAC, "meta": "目标 Meta",
+        "ranking": "排名 Ranking", "pont_comp": tx.COL_COMP, "variacao": tx.COL_VAR})
+
+
+def tendencia_pont_lacre(base: pd.DataFrame, tipo: str, freq: str = "D", ate=None, janela: int | None = None) -> pd.DataFrame:
+    """Mesma forma de `tendencia`, mas com a pontualidade do lacre (no prazo / previsto)."""
+    sub = base_pont_lacre(base)
+    sub = sub[sub["tipo_linha"] == tipo]
+    if ate is not None:
+        sub = sub[sub["dia"] <= pd.Timestamp(ate)]
+    if sub.empty:
+        return pd.DataFrame()
+    sub = sub.assign(per=periodos.inicio(sub["dia"], freq), lacre_prazo=sub["lacre_prazo"].astype(int))
+    recentes = sorted(sub["per"].unique())[-(janela or periodos.JANELA[freq]):]
+    sub = sub[sub["per"].isin(recentes)]
+    col = "reg_saida"
+
+    def taxa(df, chaves):
+        return df.groupby(chaves)["lacre_prazo"].mean().rename("taxa")
+
+    diaria = taxa(sub, [col, "per"]).unstack("per")
+    diaria.loc["合计 Total"] = taxa(sub, ["per"])
+    acumulado = pd.concat([taxa(sub, [col]), pd.Series({"合计 Total": sub["lacre_prazo"].mean()})])
+    out = diaria.copy()
+    curtos = [periodos.rotulo_curto(d, freq) for d in out.columns]
+    if len(set(curtos)) < len(curtos):
+        curtos = [periodos.rotulo_curto(d, freq, com_ano=True) for d in out.columns]
+    out.columns = curtos
+    out.insert(0, "环比 Variação±", out.iloc[:, -1] - out.iloc[:, -2] if out.shape[1] >= 2 else float("nan"))
+    out.insert(1, "累计 Acumulado", acumulado.reindex(out.index))
+    fixas = ORDEM_TENDENCIA[tipo]
+    resto = sorted(r for r in out.index if r not in fixas and r not in ("合计 Total", "SR"))
+    ordem = ["合计 Total"] + [r for r in fixas if r in out.index] + (["SR"] if "SR" in out.index else []) + resto
+    out = out.loc[ordem]
+    out.index.name = "发车区域 Região Saída"
+    return out.reset_index()

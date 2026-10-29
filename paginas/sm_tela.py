@@ -13,7 +13,7 @@ from comum.idioma import cabecalho, rodape
 from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
-from comum.tema import CINZA_DESTAQUE, VERMELHO
+from comum.tema import CINZA_DESTAQUE, VERDE, VERMELHO
 from sm import historico, resumo_ui, textos as tx
 from sm.calculos import (aplicar_techis, base_para_exportar, carregar_apoio, colunas_internas, comparar,
                          contagem_techis, df_para_xlsx, embarque_com_espaco, filtrar_techis, juntar, ler_planilha,
@@ -63,6 +63,7 @@ def _estilizar(tab: pd.DataFrame, comparando: bool):
         txt[tx.COL_COMP] = tab[tx.COL_COMP].map(pct)
         txt[tx.COL_VAR] = tab[tx.COL_VAR].map(pp)
         estilos.loc[(tab[tx.COL_VAR].round(4) < 0).fillna(False), tx.COL_VAR] = f"color:{VERMELHO};font-weight:700"
+        estilos.loc[(tab[tx.COL_VAR].round(4) > 0).fillna(False), tx.COL_VAR] = f"color:{VERDE};font-weight:700"
     estilos.iloc[0, :] = f"background-color:{CINZA_DESTAQUE};font-weight:700"
     return txt.style.apply(lambda _: estilos, axis=None)
 

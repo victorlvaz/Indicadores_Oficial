@@ -7,7 +7,7 @@ from comum.estilos import estilizar_tendencia  # noqa: F401
 from comum.exportar import para_excel
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
-from comum.tema import CINZA_DESTAQUE, VERMELHO
+from comum.tema import CINZA_DESTAQUE, VERDE, VERMELHO
 from comum.uploads import manter, opcao_valida, remover, upload_persistente
 from custos import historico, resumo_ui, textos as tx
 from custos.calculos import (TOTAL, comparar, detalhe, lista_duplicidades, lista_pendencias, ler_arquivo,
@@ -47,6 +47,7 @@ def _estilo(tab: pd.DataFrame, cols_texto: list, comp: bool):
     if comp:
         for c in (tx.COL_VAR_PACOTE, tx.COL_VAR_KM):
             est.loc[(tab[c].round(4) > 0).fillna(False), c] = f"color:{VERMELHO};font-weight:700"
+            est.loc[(tab[c].round(4) < 0).fillna(False), c] = f"color:{VERDE};font-weight:700"
     return txt.style.apply(lambda _: est, axis=None)
 
 
@@ -64,7 +65,7 @@ def _para_exportar(tab, comp, titulo=None):
     if comp:
         for c in (tx.COL_VAR_PACOTE, tx.COL_VAR_KM):
             exp[c] = exp[c] * 100
-        return exp, {"custos": True, "pp_extra": [tx.COL_VAR_PACOTE, tx.COL_VAR_KM], "titulo_img": titulo}
+        return exp, {"custos": True, "var_inverso": True, "pp_extra": [tx.COL_VAR_PACOTE, tx.COL_VAR_KM], "titulo_img": titulo}
     return exp, {"custos": True, "titulo_img": titulo}
 
 
@@ -220,7 +221,7 @@ with abas[3]:
         else:
             exp = t.copy()
         exp[tx.COL_VAR_TEND] = exp[tx.COL_VAR_TEND] * 100
-        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "pp_extra": [tx.COL_VAR_TEND], "sparkline": True, "titulo_img": tx.SUB_TEND[metrica]})
+        export[tx.SUB_TEND[metrica][:31]] = (exp, {"custos": True, "var_inverso": True, "pp_extra": [tx.COL_VAR_TEND], "sparkline": True, "titulo_img": tx.SUB_TEND[metrica]})
 
 # --- resumo ---
 with abas[4]:

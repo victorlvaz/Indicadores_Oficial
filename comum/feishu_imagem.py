@@ -13,6 +13,7 @@ from functools import lru_cache
 import pandas as pd
 from PIL import Image, ImageDraw, ImageFont
 
+VERDE = (0, 166, 81)                     # variação positiva (00A651, o mesmo do Excel)
 VERMELHO = (255, 0, 0)                    # FF0000, o mesmo vermelho do Excel exportado
 BRANCO = (255, 255, 255)
 PRETO = (0, 0, 0)
@@ -258,6 +259,7 @@ def tabela_png(df: pd.DataFrame, titulo: str, cols: dict | None = None, escala: 
         x += w
 
     taxa, meta = cols.get("taxa"), cols.get("meta")
+    pp_colunas, inverso = set(cols.get("pp_extra", ())), bool(cols.get("var_inverso"))
     for i in range(len(df)):
         y0 = alt_tit + alt_cab + i * alt_lin
         y1 = y0 + alt_lin
@@ -271,6 +273,10 @@ def tabela_png(df: pd.DataFrame, titulo: str, cols: dict | None = None, escala: 
             d.rectangle([x, y0, x + w, y1], fill=fundo, outline=CINZA_LINHA)
             texto_cel = celulas[i][j]
             alinha = "l" if (eh_texto[j] and not texto_cel.replace(",", "").replace(".", "").replace("%", "").strip().isdigit()) else "r"
+            if colunas[j] in pp_colunas:                              # variação: vermelho/verde (0 = cor normal)
+                v = df.iloc[i][colunas[j]]
+                if isinstance(v, (int, float)) and pd.notna(v) and round(v, 2) != 0:
+                    cor = VERMELHO if ((v > 0) if inverso else (v < 0)) else VERDE
             _desenhar(d, (x, y0, x + w, y1), texto_cel, cor, negrito, tam, alinha, pad)
             if dados_spark is not None and j == len(larguras) - 1:
                 _sparkline(d, (x, y0, x + w, y1), dados_spark[i], s)

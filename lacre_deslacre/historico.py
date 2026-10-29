@@ -34,6 +34,8 @@ viagens = Table(
     Column("reg_saida", String(30)),
     Column("chegada", String(150)),
     Column("reg_chegada", String(30)),
+    Column("saida_plan", DateTime),                 # partida planejada (Pontualidade do lacre)
+    Column("lacre_prazo", Integer),                 # 1 = lacrou ≥10 min antes da partida; vazio = sem a partida no arquivo
     Column("hora_lacre", String(40)),
     Column("hora_deslacre", String(40)),
     Column("lacrado", Integer, nullable=False),
@@ -73,6 +75,14 @@ def preparar_tabelas(engine) -> None:
     if "condutor" not in colunas:                 # banco criado antes da coluna do motorista: acrescenta
         with engine.begin() as con:
             con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD COLUMN condutor VARCHAR(120)")
+    colunas = {c["name"] for c in inspect(engine).get_columns(viagens.name)}
+    if "saida_plan" not in colunas:               # banco criado antes da Pontualidade do lacre
+        tipo = "DATETIME2" if engine.dialect.name == "mssql" else ("TIMESTAMP" if engine.dialect.name == "postgresql" else "DATETIME")
+        with engine.begin() as con:
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD saida_plan {tipo}" if engine.dialect.name == "mssql"
+                                else f"ALTER TABLE {viagens.name} ADD COLUMN saida_plan {tipo}")
+            con.exec_driver_sql(f"ALTER TABLE {viagens.name} ADD lacre_prazo INTEGER" if engine.dialect.name == "mssql"
+                                else f"ALTER TABLE {viagens.name} ADD COLUMN lacre_prazo INTEGER")
 
 
 def _para_registros(df: pd.DataFrame) -> list[dict]:
@@ -89,6 +99,8 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
     df["id"] = df["id"].astype(str).str.strip()
     df["cod_chegada"] = df["cod_chegada"].astype(str).str.strip()
     df["chegada_plan"] = pd.to_datetime(df["chegada_plan"])
+    df["saida_plan"] = pd.to_datetime(df["saida_plan"]).astype(object).where(df["saida_plan"].notna(), None)
+    df["lacre_prazo"] = df["lacre_prazo"].astype(object).where(df["lacre_prazo"].notna(), None)
     df["dia"] = df["chegada_plan"].dt.normalize().dt.date
     for c in ("hora_lacre", "hora_deslacre"):
         df[c] = df[c].where(df[c].notna(), None).map(lambda v: None if v is None else str(v))
@@ -115,6 +127,8 @@ def salvar(engine, base: pd.DataFrame, arquivo: str, linhas_lidas: int, observac
         registros = _para_registros(df)
         for r in registros:
             r["chegada_plan"] = r["chegada_plan"].to_pydatetime()
+            if r.get("saida_plan") is not None:
+                r["saida_plan"] = pd.Timestamp(r["saida_plan"]).to_pydatetime()
         for i in range(0, len(registros), 2000):
             con.execute(viagens.insert(), registros[i:i + 2000])
 
@@ -142,6 +156,8 @@ def ler(engine, com_original: bool = False) -> pd.DataFrame:
     df["chegada_plan"] = pd.to_datetime(df["chegada_plan"])
     df["dia"] = pd.to_datetime(df["dia"])
     df["condutor"] = df["condutor"].fillna("")
+    df["saida_plan"] = pd.to_datetime(df["saida_plan"])
+    df["lacre_prazo"] = df["lacre_prazo"].astype("Int64")
     df["lacrado"] = df["lacrado"].astype(int)
     df["deslacrado"] = df["deslacrado"].astype(int)
     # dias salvos antes da coluna existir: completa o nome pela estação (código) já conhecida em outros dias

@@ -11,7 +11,7 @@ from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
-from comum.tema import CINZA_DESTAQUE, VERMELHO
+from comum.tema import CINZA_DESTAQUE, VERDE, VERMELHO
 from comum.uploads import manter, opcao_valida
 from desperdicio import textos as tx
 from desperdicio.calculos import comparar, detalhe_veiculo, frete_por_viagem, tabela_periodo, tendencia, viagens_sem_frete
@@ -57,6 +57,7 @@ def _estilo_resumo(tab: pd.DataFrame, comp: bool):
     est.iloc[0, :] = f"background-color:{CINZA_DESTAQUE};font-weight:700"
     if comp:
         est.loc[(tab[tx.COL_VAR].round(4) > 0).fillna(False), tx.COL_VAR] = f"color:{VERMELHO};font-weight:700"
+        est.loc[(tab[tx.COL_VAR].round(4) < 0).fillna(False), tx.COL_VAR] = f"color:{VERDE};font-weight:700"
     return txt.style.apply(lambda _: est, axis=None)
 
 
@@ -150,7 +151,7 @@ for aba, tipo in zip(abas[:2], TIPOS):
             cols_exp["reais"] = [tx.COL_FRETE, tx.COL_PERDA]
         if ini is not None:
             exp[tx.COL_VAR] = exp[tx.COL_VAR] * 100
-            cols_exp.update(pct_extra=[tx.COL_COMP], pp_extra=[tx.COL_VAR])
+            cols_exp.update(pct_extra=[tx.COL_COMP], pp_extra=[tx.COL_VAR], var_inverso=True)
         export[tx.aba_excel_tabela(tipo)] = (exp, cols_exp, tx.nota_texto(tipo))
 
         st.subheader(tx.subtitulo_detalhe(tipo))

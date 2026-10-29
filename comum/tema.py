@@ -3,6 +3,7 @@ Para trocar o tom, altere só VERMELHO (e o primaryColor em .streamlit/config.to
 
 VERMELHO = "#E60000"
 SOBRE_VERMELHO = "#FFFFFF"            # texto sobre fundo vermelho
+VERDE = "#1E9E4A"                     # só na coluna de variação (p.p.) positiva; o resto segue vermelho/cinza
 
 # Mini-gráficos de tendência (segundo a imagem de referência): linha azul, pontos vermelhos
 LINHA_TENDENCIA = "#3b6ea5"

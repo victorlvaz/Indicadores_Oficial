@@ -51,6 +51,34 @@ def aba_excel_tendencia(tipo: str, evento: str) -> str:
     return bi(TIPO_ZH[tipo] + EVENTO_ZH[evento] + TENDENCIA_ZH, f"Tend {TIPO_PT[tipo]} {EVENTO_PT[evento]}")
 
 
+# ---- Pontualidade do lacre ----
+INDICADOR = bi("指标", "Indicador")
+IND_LAC = bi("封车率 / 解车率", "Taxa de Lacre / Deslacre")                                # [revisar]
+IND_PL = bi("封车准点率", "Pontualidade do lacre")                                        # [revisar]
+PL_NOTAS = (PL_NOTA_ZH := ["备注：准时封车 = 计划发车前至少10分钟封车（或发车日之前封车）；分母 = 应封车任务数；未封车算不准时。"],
+            ["Obs: Lacre no prazo = lacrado ≥ 10 min antes da partida planejada (ou em dia anterior); denominador = lacre previsto; sem hora de lacre = fora do prazo. Regional de saída. Meta 95%."])
+def pl_nome_aba(tipo): return bi(TIPO_ZH[tipo] + "封车准点", f"{TIPO_PT[tipo]} · Pontualidade do lacre")
+PL_ABA = bi("封车准点率", "Pontualidade do lacre")                                       # [revisar]
+PL_ABA_TEND = bi("封车准点率趋势", "Tendência pontualidade do lacre")                     # [revisar]
+PL_PREV = "应封车 Lacre previsto"
+PL_LAC = "实际封车 Lacre realizado"
+PL_PRAZO = "准时封车 Lacre no prazo"
+PL_TAXA_LAC = "封车率 Taxa de lacre"
+PL_PONT = "封车准点率 Pontualidade do lacre"
+PL_PONT_LAC = "准点率(已封车) % no prazo entre lacrados"
+PL_TITULO = {"COLETA": "集货支线封车准点率 / Pontualidade do lacre - Coleta",
+             "ENTREGA": "散货支线封车准点率 / Pontualidade do lacre - Entrega"}
+PL_NOTA = ("备注：准时封车 = 发车计划时间前至少10分钟完成封车（或在计划发车日之前封车）；分母 = 应封车任务数；未封车算不准时。\n"
+           "Obs: Lacre no prazo = lacrado pelo menos 10 min antes da partida planejada (ou em dia anterior); "
+           "denominador = lacre previsto; sem hora de lacre = fora do prazo. Regional = regional de saída. Meta 95%.")
+PL_SEM_PARTIDA = ("Sem a coluna “Tempo de partida planejada”: {n} dia(s) do histórico ficaram fora desta aba. "
+                  "Envie o consolidado desses dias de novo e salve.")
+PL_VAZIO = "Nenhum dia do histórico tem “Tempo de partida planejada”. Envie o consolidado novamente e salve."
+def pl_aba_excel(tipo): return bi(TIPO_ZH[tipo] + "封车准点", f"Pont Lacre {TIPO_PT[tipo]}")
+def pl_aba_excel_tend(tipo): return bi(TIPO_ZH[tipo] + "封车准点趋势", f"Tend Pont Lacre {TIPO_PT[tipo]}")
+def pl_subtitulo_tend(tipo): return bi(TIPO_ZH[tipo] + "封车准点率趋势", f"Tendência – Pontualidade do lacre · {TIPO_PT[tipo]}")
+
+
 ABA_RESUMO = bi("汇总", "Resumo")                                                       # [revisar]
 ABA_BASE = bi("数据源 / 核对", "Base / Diagnóstico")                                     # 数据源 [planilha]; 核对 [revisar]
 
@@ -181,6 +209,8 @@ COLUNAS_BASE = {
     "chegada_plan": bi("计划到达时间", "Chegada planejada"),
     "hora_lacre": bi("封车时间", "Hora de lacre"),
     "hora_deslacre": bi("解车时间", "Hora de deslacre"),
+    "saida_plan": bi("计划发车时间", "Partida planejada"),
+    "lacre_prazo": bi("准时封车", "Lacre no prazo"),
     "dia": bi("日期", "Dia"),                                                             # [revisar]
     "lacrado": bi("已封车", "Lacrado"),                                                   # [revisar]
     "deslacrado": bi("已解车", "Deslacrado"),                                             # [revisar]

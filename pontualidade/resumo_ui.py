@@ -7,7 +7,7 @@ import streamlit as st
 from comum import periodos, resumo_dia
 from comum.estilos import pct, pp
 from comum.graficos_plotly import mapa_calor, ranking_meta
-from comum.tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERMELHO
+from comum.tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERDE, VERMELHO
 from comum.uploads import opcao_valida
 from . import textos as tx
 from .calculos import regionais, resumo, resumo_regionais, tabela_periodo, visao
@@ -50,6 +50,7 @@ def _tabela(df, ind):
     est.iloc[0, :] = f"background-color:{CINZA_DESTAQUE};font-weight:700"
     est.loc[(cru[col_x] < META).fillna(False), col_x] = CSS_ABAIXO_META
     est.loc[(cru[tx.COL_VAR].round(4) < 0).fillna(False), tx.COL_VAR] = f"color:{VERMELHO};font-weight:700"
+    est.loc[(cru[tx.COL_VAR].round(4) > 0).fillna(False), tx.COL_VAR] = f"color:{VERDE};font-weight:700"
     return cru, txt.style.apply(lambda _: est, axis=None)
 
 

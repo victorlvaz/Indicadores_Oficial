@@ -17,7 +17,7 @@ import json
 import requests
 
 DOMINIO_PADRAO = "https://open.feishu.cn"
-TIMEOUT = 30
+TIMEOUT = 90
 LINHA_EM_BRANCO = [{"tag": "text", "text": "\u200b"}]      # parágrafo vazio (espaço de largura zero: o Feishu recusa texto vazio e apara espaços comuns)
 
 
@@ -62,9 +62,16 @@ def token(cfg: dict) -> str:
 
 
 def subir_imagem(cfg: dict, tk: str, png: bytes, nome: str = "tabela.png") -> str:
-    r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/images", headers={"Authorization": f"Bearer {tk}"},
-                      data={"image_type": "message"}, files={"image": (nome, png, "image/png")}, timeout=TIMEOUT)
-    return _resposta(r, "envio da imagem")["data"]["image_key"]
+    for tentativa in range(3):                          # subir imagem é seguro repetir (não posta nada no grupo)
+        try:
+            r = requests.post(f"{cfg['dominio']}/open-apis/im/v1/images", headers={"Authorization": f"Bearer {tk}"},
+                              data={"image_type": "message"}, files={"image": (nome, png, "image/png")}, timeout=TIMEOUT)
+            return _resposta(r, "envio da imagem")["data"]["image_key"]
+        except (requests.Timeout, requests.ConnectionError):
+            if tentativa == 2:
+                raise
+            import time
+            time.sleep(2 * (tentativa + 1))
 
 
 def subir_arquivo(cfg: dict, tk: str, nome: str, dados: bytes) -> str:

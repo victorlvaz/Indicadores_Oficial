@@ -1,7 +1,7 @@
 """Formatação visual das tabelas na tela (cor de meta, percentuais)."""
 import pandas as pd
 
-from .tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERMELHO
+from .tema import CINZA_DESTAQUE, CSS_ABAIXO_META, VERDE, VERMELHO
 
 
 def pct(v, sinal=False) -> str:
@@ -44,6 +44,8 @@ def estilizar_tabela(df: pd.DataFrame, col_taxa: str, col_meta: str, col_comp: s
     if col_var:
         caiu = (df[col_var].round(4) < 0).fillna(False)
         estilos.loc[caiu, col_var] = f"color:{VERMELHO};font-weight:700"
+        subiu = (df[col_var].round(4) > 0).fillna(False)
+        estilos.loc[subiu, col_var] = f"color:{VERDE};font-weight:700"
     return txt.style.apply(lambda _: estilos, axis=None)
 
 

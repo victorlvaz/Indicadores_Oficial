@@ -6,8 +6,9 @@ import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .tema import SOBRE_VERMELHO, VERMELHO
+from .tema import SOBRE_VERMELHO, VERDE, VERMELHO
 
+VERDE_XLSX = "00A651"                        # verde da variação positiva (só no Excel/imagem)
 VERMELHO_XLSX = "FF0000"                      # vermelho da planilha de referência (só no Excel exportado; a tela segue o tema)
 FONTE = "Calibri"
 PREENCHE_VERMELHO = PatternFill("solid", fgColor=VERMELHO_XLSX)
@@ -153,6 +154,18 @@ def para_excel(abas: dict[str, tuple[pd.DataFrame, dict]], titulo: str = "", per
                     if _eh_numero(t) and _eh_numero(m) and t < m:
                         ws.cell(r, ct).fill = PREENCHE_VERMELHO
                         ws.cell(r, ct).font = FONTE_SOBRE_VERMELHO
+            for c in cols.get("pp_extra", ()):                      # variação: vermelho se piorou, verde se melhorou, 0 = cor automática
+                if c not in colunas:
+                    continue
+                ci = colunas.index(c) + 1
+                for r in range(o + 2, ws.max_row + 1):
+                    v = ws.cell(r, ci).value
+                    if not _eh_numero(v) or round(v, 2) == 0:
+                        continue
+                    ruim = v > 0 if cols.get("var_inverso") else v < 0
+                    f0 = ws.cell(r, ci).font
+                    ws.cell(r, ci).font = Font(name=f0.name or FONTE, bold=f0.bold, size=f0.size,
+                                               color=(VERMELHO_XLSX if ruim else VERDE_XLSX))
             if nota:                                              # rodapé centralizado, abaixo da tabela
                 linha = ws.max_row + 2
                 ws.merge_cells(start_row=linha, start_column=1, end_row=linha, end_column=max(len(colunas), 2))

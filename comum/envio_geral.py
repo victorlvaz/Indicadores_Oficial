@@ -15,7 +15,8 @@ from .envio_worker import MARCA_COMENTARIO, RAIZ
 
 # (id, nome PT, nome ZH, página, prefixo das chaves da página, extras no session_state)
 INDICADORES = [
-    ("lac", "Lacre / Deslacre", "支线解封车率", "paginas/lacre_deslacre_tela.py", "lac", {}),
+    ("lac", "Lacre / Deslacre", "支线解封车率", "paginas/lacre_deslacre_tela.py", "lac", {"lac_ind": "lac"}),
+    ("lac_pl", "Pontualidade do lacre", "封车准点率", "paginas/lacre_deslacre_tela.py", "lac", {"lac_ind": "pl"}),
     ("sm", "SM", "SM状态统计", "paginas/sm_tela.py", "sm", {}),
     ("app", "Uso de APP", "支线打卡率", "paginas/app_uso_tela.py", "app", {}),
     ("pt_chegada", "Pontualidade — Chegada", "支线准点率 — 到达", "paginas/pontualidade_tela.py", "pt", {"pt_ind": "CHEGADA"}),

@@ -13,7 +13,7 @@ from comum.exportar import para_excel, periodo_texto, titulo_relatorio
 from comum.idioma import cabecalho, rodape
 from comum.sparkline import tabela_tendencia_html
 from comum import janela as janela_ui
-from comum.tema import CINZA_DESTAQUE, VERMELHO
+from comum.tema import CINZA_DESTAQUE, VERDE, VERMELHO
 from comum.uploads import esvaziar, manter, opcao_valida, upload_persistente
 from ocupacao import historico, resumo_ui, textos as tx
 from ocupacao.calculos import (TOTAL, carregar_apoio, comparar, detalhe_veiculo, ler_relatorio, preparar,
@@ -51,6 +51,7 @@ def _estilo_resumo(tab: pd.DataFrame, comp: bool):
     est.iloc[0, :] = f"background-color:{CINZA_DESTAQUE};font-weight:700"
     if comp:
         est.loc[(tab[tx.COL_VAR].round(4) < 0).fillna(False), tx.COL_VAR] = f"color:{VERMELHO};font-weight:700"
+        est.loc[(tab[tx.COL_VAR].round(4) > 0).fillna(False), tx.COL_VAR] = f"color:{VERDE};font-weight:700"
     return txt.style.apply(lambda _: est, axis=None)
 
 

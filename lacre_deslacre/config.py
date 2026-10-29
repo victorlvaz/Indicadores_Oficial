@@ -19,6 +19,7 @@ COL = {
     "reg_chegada": "Regional de chegada do carro",
     "cod_chegada": "Código de estação de chegada",
     "chegada_plan": "Tempo de chegada planejado",
+    "saida_plan": "Tempo de partida planejada",          # opcional: só a Pontualidade do lacre usa
     "hora_lacre": "hora de lacre",
     "hora_deslacre": "hora de deslacre",
 }
@@ -41,6 +42,8 @@ TRANSPORTADOR_EXCLUIDO = "Franqueado"     # prefixo do valor, ex.: "Franqueado-�
 PEDIDO_MAE_MINIMO = 2                     # vazio, 0 e 1 são excluídos
 
 METAS = {"lacre": 0.95, "deslacre": 0.90}
+META_PONT_LACRE = 0.95
+MINUTOS_LACRE_ANTES = 10        # lacre no prazo = pelo menos 10 min antes da partida planejada (ou em dia anterior)
 
 # (tipo de linha, evento) -> definição da tabela
 INDICADORES = {
